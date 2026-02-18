@@ -64,9 +64,9 @@ ENS Resolution: alice.bankrclub.eth → CCIP-Read Gateway → Database → Resol
 
 ## Contract Addresses
 
-**BankrClub NFT (Base):** TBD - need from @0xDeployer
-**$BNKR:** TBD
-**$CLAWDIA:** `0xbbd9aDe16525acb4B336b6dAd3b9762901522B07`
+**BankrClub NFT (Base):** `0x9FAb8C51f911f0ba6dab64fD6E979BcF6424Ce82`
+**$BNKR (Base):** TBD - need to find on Basescan/Dexscreener
+**$CLAWDIA (Base):** `0xbbd9aDe16525acb4B336b6dAd3b9762901522B07`
 **bankrclub.eth owner:** `0x615e3faa99dd7de64812128a953215a09509f16a` (Clawdia's Bankr wallet)
 
 ## Local Development
