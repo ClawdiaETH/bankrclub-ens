@@ -1,3 +1,5 @@
+import TypewriterSubdomain from './components/TypewriterSubdomain';
+
 export default function Home() {
   return (
     <main className="min-h-screen bg-gray-900 text-white">
@@ -16,9 +18,7 @@ export default function Home() {
             />
           </div>
           
-          <h1 className="text-6xl sm:text-7xl font-bold tracking-tight">
-            bankrclub<span className="text-blue-400">.eth</span>
-          </h1>
+          <TypewriterSubdomain />
           <p className="text-xl sm:text-2xl text-gray-300 max-w-2xl mx-auto">
             Exclusive ENS subdomains for BankrClub NFT holders
           </p>
