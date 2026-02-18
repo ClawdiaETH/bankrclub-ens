@@ -4,7 +4,7 @@ import { useState, useEffect } from 'react';
 
 const SUBDOMAINS = [
   'vitalik',
-  '💻',
+  'based',
   'deployer',
   'jesse',
   'clawdia',
