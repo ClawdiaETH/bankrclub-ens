@@ -1,19 +1,40 @@
 export default function Home() {
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-8">
-      <div className="max-w-2xl w-full space-y-8 text-center">
-        <div>
+    <main className="min-h-screen flex flex-col items-center justify-center p-8 bg-gradient-to-br from-purple-50 via-blue-50 to-orange-50">
+      <div className="max-w-4xl w-full space-y-8">
+        {/* Hero Section */}
+        <div className="text-center space-y-6">
+          <div className="flex justify-center mb-6">
+            <img 
+              src="/assets/bankr-computer.gif" 
+              alt="BankrClub" 
+              className="w-48 h-auto"
+            />
+          </div>
+          
           <h1 className="text-5xl font-bold text-gray-900 mb-4">
             bankrclub<span className="text-blue-600">.eth</span>
           </h1>
           <p className="text-xl text-gray-600">
-            Claim your exclusive ENS subdomain
+            Exclusive ENS subdomains for BankrClub NFT holders
           </p>
         </div>
 
         <div className="bg-white rounded-lg shadow-lg p-8 space-y-6">
-          <div className="space-y-2">
-            <h2 className="text-2xl font-semibold">For BankrClub NFT Holders</h2>
+          <div className="space-y-4">
+            <div className="flex items-center justify-center gap-4 mb-4">
+              <img 
+                src="/assets/bankr-card-1.gif" 
+                alt="BankrClub Membership" 
+                className="w-32 h-auto rounded-lg shadow-md"
+              />
+              <div className="text-left">
+                <h2 className="text-2xl font-semibold">For BankrClub NFT Holders</h2>
+                <p className="text-gray-600">
+                  1,000 founding members only
+                </p>
+              </div>
+            </div>
             <p className="text-gray-600">
               Register <span className="font-mono text-blue-600">yourname.bankrclub.eth</span> — a permanent, decentralized identity on Ethereum.
             </p>
@@ -41,9 +62,14 @@ export default function Home() {
             Connect Wallet (Coming Soon)
           </button>
 
-          <p className="text-sm text-gray-500">
-            Built by <a href="https://x.com/ClawdiaBotAI" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline">@ClawdiaBotAI</a> for the Bankr ecosystem 🐚
-          </p>
+          <div className="text-sm text-gray-500 space-y-2 border-t pt-4">
+            <p>
+              Built by <a href="https://x.com/ClawdiaBotAI" target="_blank" rel="noopener noreferrer" className="text-blue-600 hover:underline font-medium">@ClawdiaBotAI</a> for the <a href="https://x.com/bankrbot" target="_blank" rel="noopener noreferrer" className="text-orange-600 hover:underline font-medium">Bankr</a> ecosystem 🐚
+            </p>
+            <p className="text-xs">
+              BankrClub NFT: <a href="https://basescan.org/address/0x9FAb8C51f911f0ba6dab64fD6E979BcF6424Ce82" target="_blank" rel="noopener noreferrer" className="font-mono text-gray-400 hover:text-blue-600">0x9FAb...Ce82</a>
+            </p>
+          </div>
         </div>
 
         <div className="text-sm text-gray-500 space-y-1">
