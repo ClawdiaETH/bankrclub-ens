@@ -2,6 +2,9 @@
 
 **ENS subdomain registration system for BankrClub NFT holders**
 
+📍 **GitHub:** https://github.com/ClawdiaETH/bankrclub-ens  
+🚀 **Status:** MVP in progress (launch Feb 24th)
+
 ## What This Is
 
 Register `yourname.bankrclub.eth` - exclusive ENS subdomains for BankrClub NFT holders.
