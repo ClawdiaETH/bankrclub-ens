@@ -123,3 +123,30 @@ git push origin main
 - The two warnings in `npm run build` output are from optional dev deps in MetaMask SDK and WalletConnect packages — not our code, not breaking.
 - Token launches are safe by default: `simulateOnly=true` when `BANKR_PARTNER_KEY=pending`. No real tokens deployed until you get the partner key.
 - CCIP-Read gateway (`/api/resolve`) returns unsigned responses in dev (no `GATEWAY_SIGNING_KEY`). Needs signing key + deployed resolver for production ENS resolution to work.
+
+---
+
+## IPFS / ENS Hosting Pipeline
+
+**Deploy to `bankrclub.eth.limo`** (frontend on IPFS, API stays on Vercel):
+
+```bash
+# Set the Vercel URL as the API target, then run the deploy script
+NEXT_PUBLIC_API_URL=https://bankrclub-ens.vercel.app bash scripts/deploy-ipfs.sh
+```
+
+**What it does:**
+1. Builds a fully static export (`NEXT_PUBLIC_IPFS_BUILD=true` → `output: 'export'`)
+2. Uploads the `out/` directory to IPFS via Pinata
+3. Updates `bankrclub.eth` contenthash via the ENS Public Resolver on Ethereum mainnet
+
+**Architecture with IPFS:**
+```
+https://bankrclub.eth.limo  →  IPFS (static frontend)
+                                    ↓ API calls
+                          https://bankrclub-ens.vercel.app  (API routes)
+```
+
+**Requirements:** `pinata_jwt` and `signing_key` in macOS Keychain (via `~/clawd/scripts/get-secret.sh`).
+
+**Note on contenthash encoding:** The script uses a basic UTF-8 CID encoding. If ENS resolution breaks, verify the hex encoding at https://content-hash.now.sh and update the `CONTENTHASH` line in `scripts/deploy-ipfs.sh`.

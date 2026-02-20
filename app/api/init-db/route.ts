@@ -19,9 +19,13 @@ export async function GET() {
       bankr_tx_hash VARCHAR(66),
       registered_at TIMESTAMP DEFAULT NOW(),
       is_premium BOOLEAN DEFAULT FALSE,
-      premium_paid_eth DECIMAL(18,8)
+      premium_paid_eth DECIMAL(18,8),
+      payment_token VARCHAR(10) DEFAULT 'ETH'
     )
   `;
+
+  // Migrate existing tables that predate the payment_token column
+  await sql`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payment_token VARCHAR(10) DEFAULT 'ETH'`;
 
   await sql`CREATE INDEX IF NOT EXISTS idx_subdomain ON registrations(subdomain)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_address ON registrations(address)`;

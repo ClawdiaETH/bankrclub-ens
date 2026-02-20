@@ -12,7 +12,8 @@ import { sql } from '@vercel/postgres';
 //   bankr_tx_hash VARCHAR(66),
 //   registered_at TIMESTAMP DEFAULT NOW(),
 //   is_premium BOOLEAN DEFAULT FALSE,
-//   premium_paid_eth DECIMAL(18,8)
+//   premium_paid_eth DECIMAL(18,8),
+//   payment_token VARCHAR(10) DEFAULT 'ETH'
 // );
 
 export async function checkAvailability(subdomain: string): Promise<boolean> {
@@ -35,10 +36,19 @@ export async function createRegistration(data: {
   address: string;
   tokenId?: number;
   isPremium?: boolean;
+  paymentToken?: string;
+  premiumPaidEth?: number;
 }) {
   const result = await sql`
-    INSERT INTO registrations (subdomain, address, token_id, is_premium)
-    VALUES (${data.subdomain}, ${data.address}, ${data.tokenId || null}, ${data.isPremium || false})
+    INSERT INTO registrations (subdomain, address, token_id, is_premium, payment_token, premium_paid_eth)
+    VALUES (
+      ${data.subdomain},
+      ${data.address},
+      ${data.tokenId || null},
+      ${data.isPremium || false},
+      ${data.paymentToken || 'ETH'},
+      ${data.premiumPaidEth || null}
+    )
     RETURNING *
   `;
   return result.rows[0];

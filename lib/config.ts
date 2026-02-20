@@ -10,16 +10,18 @@ export const CONTRACTS = {
     chainId: 8453,
   },
 
-  // Tokens
-  // NOTE: $BNKR address is TBD — update once official contract is deployed
+  // Discount tokens
+  // TODO: confirm $BNKR address once official contract is deployed on Base
   BNKR: {
-    address: '0x0000000000000000000000000000000000000000' as `0x${string}`, // TODO: $BNKR address TBD
+    address: '0x0000000000000000000000000000000000000001' as `0x${string}`, // TODO: confirm $BNKR address
+    symbol: 'BNKR',
     chain: 'base',
     discount: 0.10, // 10% off premium names
   },
 
   CLAWDIA: {
     address: '0xbbd9aDe16525acb4B336b6dAd3b9762901522B07' as `0x${string}`,
+    symbol: 'CLAWDIA',
     chain: 'base',
     discount: 0.25, // 25% off premium names
   },

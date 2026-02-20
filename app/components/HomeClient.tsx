@@ -4,6 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useReadContract } from 'wagmi';
 import TypewriterSubdomain from './TypewriterSubdomain';
+import PaymentSelector, { PaymentToken } from './PaymentSelector';
+import { getDiscountTokenBalances, TokenBalances } from '@/lib/tokenBalances';
+
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
 const BANKRCLUB_NFT = '0x9FAb8C51f911f0ba6dab64fD6E979BcF6424Ce82' as const;
 
@@ -21,6 +25,11 @@ interface AvailabilityResult {
   available: boolean;
   isPremium?: boolean;
   price?: number;
+  prices?: {
+    eth: number;
+    bnkr: number;
+    clawdia: number;
+  };
   reason?: string;
   name?: string;
 }
@@ -30,6 +39,7 @@ interface ClaimResult {
   subdomain: string;
   ens: string;
   address: string;
+  paymentToken?: PaymentToken;
   tokenInfo?: {
     tokenAddress: string;
     tokenSymbol: string;
@@ -61,6 +71,24 @@ export default function Home() {
   const [claimResult, setClaimResult] = useState<ClaimResult | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
 
+  // Payment token state
+  const [paymentToken, setPaymentToken] = useState<PaymentToken>('ETH');
+  const [tokenBalances, setTokenBalances] = useState<TokenBalances | null>(null);
+
+  // Fetch discount token balances once wallet is verified as holder
+  useEffect(() => {
+    if (!address || !isHolder) {
+      setTokenBalances(null);
+      return;
+    }
+    getDiscountTokenBalances(address).then(setTokenBalances).catch(() => setTokenBalances(null));
+  }, [address, isHolder]);
+
+  // Reset payment token when balances arrive (avoid stale selection)
+  useEffect(() => {
+    setPaymentToken('ETH');
+  }, [address]);
+
   // Debounced availability check
   const checkAvailability = useCallback(async (n: string) => {
     if (!n || n.length < 3) {
@@ -69,7 +97,7 @@ export default function Home() {
     }
     setCheckingAvailability(true);
     try {
-      const res = await fetch(`/api/check?name=${encodeURIComponent(n)}`);
+      const res = await fetch(`${API_BASE}/api/check?name=${encodeURIComponent(n)}`);
       const data = await res.json();
       setAvailability(data);
     } catch {
@@ -89,25 +117,36 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [name, checkAvailability]);
 
+  // Compute the final price to display based on selected payment token
+  const displayPrice = (() => {
+    if (!availability?.isPremium || !availability.price) return null;
+    if (availability.prices) {
+      if (paymentToken === 'BNKR') return availability.prices.bnkr;
+      if (paymentToken === 'CLAWDIA') return availability.prices.clawdia;
+    }
+    return availability.price;
+  })();
+
   const handleClaim = async () => {
     if (!address || !availability?.available) return;
     setClaiming(true);
     setClaimError(null);
     try {
-      const res = await fetch('/api/claim', {
+      const res = await fetch(`${API_BASE}/api/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           subdomain: name.toLowerCase().trim(),
           address,
           launchTokenOnBankr: launchToken,
+          paymentToken,
         }),
       });
       const data = await res.json();
       if (!res.ok) {
         setClaimError(data.error || 'Claim failed');
       } else {
-        setClaimResult(data);
+        setClaimResult({ ...data, paymentToken });
       }
     } catch {
       setClaimError('Network error. Please try again.');
@@ -115,6 +154,12 @@ export default function Home() {
       setClaiming(false);
     }
   };
+
+  const discountLabel = (() => {
+    if (claimResult?.paymentToken === 'BNKR') return 'Paid with $BNKR — 10% off!';
+    if (claimResult?.paymentToken === 'CLAWDIA') return 'Paid with $CLAWDIA — 25% off!';
+    return null;
+  })();
 
   return (
     <main className="min-h-screen bg-gray-900 text-white">
@@ -178,6 +223,11 @@ export default function Home() {
                     {claimResult.ens}
                   </p>
                 </div>
+                {discountLabel && (
+                  <div className="bg-gray-800 rounded-xl p-4 border border-green-700">
+                    <p className="text-green-400 font-semibold text-sm">💸 {discountLabel}</p>
+                  </div>
+                )}
                 {claimResult.tokenInfo && (
                   <div className="bg-gray-800 rounded-xl p-6 border border-orange-500 space-y-3">
                     <p className="text-orange-400 font-semibold">
@@ -258,7 +308,7 @@ export default function Home() {
               </p>
               <div className="flex flex-col sm:flex-row gap-4 justify-center">
                 <a
-                  href="https://opensea.io/collection/bankrclub"
+                  href="https://opensea.io/collection/bankr-club"
                   target="_blank"
                   rel="noopener noreferrer"
                   className="bg-gradient-to-r from-purple-600 to-orange-600 text-white font-bold py-3 px-8 rounded-xl hover:opacity-90 transition-opacity"
@@ -324,7 +374,7 @@ export default function Home() {
                   }`}>
                     {availability.available ? (
                       <>
-                        ✓ Available{availability.isPremium && ` — Premium name (${availability.price} ETH)`}
+                        ✓ Available{availability.isPremium && ` — Premium name (${displayPrice ?? availability.price} ETH)`}
                         {!availability.isPremium && ' — Free!'}
                       </>
                     ) : (
@@ -336,6 +386,17 @@ export default function Home() {
                   <p className="mt-2 text-sm text-yellow-400">Minimum 3 characters</p>
                 )}
               </div>
+
+              {/* Payment selector — only for premium names */}
+              {availability?.available && availability.isPremium && availability.price && (
+                <PaymentSelector
+                  basePrice={availability.price}
+                  hasBnkr={tokenBalances?.hasBnkr ?? false}
+                  hasClawdia={tokenBalances?.hasClawdia ?? false}
+                  selected={paymentToken}
+                  onChange={setPaymentToken}
+                />
+              )}
 
               {/* Token launch toggle */}
               <div

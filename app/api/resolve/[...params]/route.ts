@@ -3,6 +3,16 @@ import { getRegistration } from '@/lib/db';
 import { encodeResult, signResponse, parseSubdomainFromCalldata } from '@/lib/ensResolver';
 import { ethers } from 'ethers';
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',
+  'Access-Control-Allow-Headers': 'Content-Type',
+};
+
+export async function OPTIONS() {
+  return new NextResponse(null, { status: 200, headers: corsHeaders });
+}
+
 export async function GET(
   req: NextRequest,
   { params }: { params: Promise<{ params: string[] }> }
@@ -11,13 +21,13 @@ export async function GET(
   const [sender, calldata] = resolvedParams.params;
 
   if (!sender || !calldata) {
-    return NextResponse.json({ error: 'invalid CCIP-Read request' }, { status: 400 });
+    return NextResponse.json({ error: 'invalid CCIP-Read request' }, { status: 400, headers: corsHeaders });
   }
 
   // Parse subdomain from calldata
   const fullName = parseSubdomainFromCalldata(calldata);
   if (!fullName) {
-    return NextResponse.json({ error: 'could not parse name' }, { status: 400 });
+    return NextResponse.json({ error: 'could not parse name' }, { status: 400, headers: corsHeaders });
   }
 
   // Extract subdomain (remove .bankrclub.eth or .bankrclub)
@@ -40,13 +50,13 @@ export async function GET(
   const signingKey = process.env.GATEWAY_SIGNING_KEY;
   if (!signingKey) {
     // Return unsigned response for dev
-    return NextResponse.json({ data: result });
+    return NextResponse.json({ data: result }, { headers: corsHeaders });
   }
 
   const sig = await signResponse(calldata, result, validUntil, signingKey);
   const abiEncoded = encodeResponse(result, validUntil, sig);
 
-  return NextResponse.json({ data: abiEncoded });
+  return NextResponse.json({ data: abiEncoded }, { headers: corsHeaders });
 }
 
 function encodeResponse(result: string, validUntil: number, sig: string): string {
