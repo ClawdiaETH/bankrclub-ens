@@ -29,13 +29,9 @@ export async function signResponse(
 
 export function parseSubdomainFromCalldata(calldata: string): string | null {
   try {
-    // ENS resolve calldata: selector(4) + encoded DNS name + resolver data
-    // Skip the selector and decode the DNS-encoded name
-    const data = calldata.startsWith('0x') ? calldata.slice(2) : calldata;
-    // First 4 bytes = selector (9061b923 = resolve(bytes,bytes))
-    // Next is ABI-encoded bytes (DNS name)
+    // calldata is abi.encode(name, data) where name is DNS-encoded
     const abiCoder = new ethers.AbiCoder();
-    const [dnsEncodedName] = abiCoder.decode(['bytes', 'bytes'], '0x' + data.slice(8));
+    const [dnsEncodedName] = abiCoder.decode(['bytes', 'bytes'], calldata);
     return decodeDNSName(dnsEncodedName as string);
   } catch {
     return null;

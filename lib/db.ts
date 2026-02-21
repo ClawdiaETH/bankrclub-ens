@@ -39,7 +39,7 @@ export async function createRegistration(data: {
     VALUES (
       ${data.subdomain},
       ${data.address},
-      ${data.tokenId || null},
+      ${data.tokenId ?? null},
       ${data.isPremium || false},
       ${data.paymentToken || 'ETH'},
       ${data.premiumPaidEth || null}

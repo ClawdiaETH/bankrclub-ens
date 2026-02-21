@@ -94,12 +94,13 @@ contract OffchainResolver is IExtendedResolver, ISupportsInterface {
         // Addr and all other subdomain queries — use CCIP-Read gateway
         string[] memory urls = new string[](1);
         urls[0] = string(abi.encodePacked(url, "/{sender}/{data}"));
+        bytes memory encodedRequest = abi.encode(name, data);
         revert OffchainLookup(
             address(this),
             urls,
-            data,
+            encodedRequest,
             OffchainResolver.resolveWithProof.selector,
-            abi.encode(name, data)
+            encodedRequest
         );
     }
 
