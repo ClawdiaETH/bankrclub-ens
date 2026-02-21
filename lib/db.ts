@@ -1,4 +1,6 @@
-import { sql } from '@vercel/postgres';
+import { neon } from '@neondatabase/serverless';
+
+const sql = neon(process.env.POSTGRES_URL!);
 
 // Schema (run once via /api/init-db):
 // CREATE TABLE IF NOT EXISTS registrations (
@@ -17,18 +19,18 @@ import { sql } from '@vercel/postgres';
 // );
 
 export async function checkAvailability(subdomain: string): Promise<boolean> {
-  const result = await sql`SELECT id FROM registrations WHERE subdomain = ${subdomain}`;
-  return result.rows.length === 0;
+  const rows = await sql`SELECT id FROM registrations WHERE subdomain = ${subdomain}`;
+  return rows.length === 0;
 }
 
 export async function getRegistration(subdomain: string) {
-  const result = await sql`SELECT * FROM registrations WHERE subdomain = ${subdomain}`;
-  return result.rows[0] || null;
+  const rows = await sql`SELECT * FROM registrations WHERE subdomain = ${subdomain}`;
+  return rows[0] || null;
 }
 
 export async function getRegistrationByAddress(address: string) {
-  const result = await sql`SELECT * FROM registrations WHERE LOWER(address) = LOWER(${address}) LIMIT 1`;
-  return result.rows[0] || null;
+  const rows = await sql`SELECT * FROM registrations WHERE LOWER(address) = LOWER(${address}) LIMIT 1`;
+  return rows[0] || null;
 }
 
 export async function createRegistration(data: {
@@ -39,7 +41,7 @@ export async function createRegistration(data: {
   paymentToken?: string;
   premiumPaidEth?: number;
 }) {
-  const result = await sql`
+  const rows = await sql`
     INSERT INTO registrations (subdomain, address, token_id, is_premium, payment_token, premium_paid_eth)
     VALUES (
       ${data.subdomain},
@@ -51,7 +53,7 @@ export async function createRegistration(data: {
     )
     RETURNING *
   `;
-  return result.rows[0];
+  return rows[0];
 }
 
 export async function updateTokenInfo(
@@ -74,9 +76,9 @@ export async function updateTokenInfo(
 }
 
 export async function getRecentRegistrations(limit = 10) {
-  const result = await sql`
+  const rows = await sql`
     SELECT subdomain, address, bankr_token_address, bankr_token_symbol, registered_at
     FROM registrations ORDER BY registered_at DESC LIMIT ${limit}
   `;
-  return result.rows;
+  return rows;
 }
