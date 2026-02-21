@@ -97,6 +97,13 @@ export default function Home() {
   const [feeRecipientType, setFeeRecipientType] = useState<FeeRecipientType>('wallet');
   const [feeRecipientValue, setFeeRecipientValue] = useState('');
 
+  // Token logo state
+  const [logoMode, setLogoMode] = useState<'nft' | 'custom'>('nft');
+  const [customLogoUrl, setCustomLogoUrl] = useState('');
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [uploadingLogo, setUploadingLogo] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
   // Advanced options state
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [tweetUrl, setTweetUrl] = useState('');
@@ -176,6 +183,7 @@ export default function Home() {
           feeRecipientType,
           feeRecipientValue: feeRecipientType === 'wallet' ? address : feeRecipientValue.trim(),
           tweetUrl: tweetUrl.trim() || undefined,
+          logoUrl: logoMode === 'custom' && customLogoUrl ? customLogoUrl : undefined,
         }),
       });
       const data = await res.json();
@@ -188,6 +196,32 @@ export default function Home() {
       setClaimError('Network error. Please try again.');
     } finally {
       setClaiming(false);
+    }
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadError(null);
+    setUploadingLogo(true);
+    // Show local preview immediately
+    setLogoPreview(URL.createObjectURL(file));
+    try {
+      const form = new FormData();
+      form.append('file', file);
+      const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
+      const data = await res.json();
+      if (!res.ok) {
+        setUploadError(data.error || 'Upload failed');
+        setLogoPreview(null);
+      } else {
+        setCustomLogoUrl(data.url);
+      }
+    } catch {
+      setUploadError('Network error during upload');
+      setLogoPreview(null);
+    } finally {
+      setUploadingLogo(false);
     }
   };
 
@@ -473,7 +507,7 @@ export default function Home() {
                   <div>
                     <p className="text-white font-semibold">🚀 Launch my token on Bankr</p>
                     <p className="text-gray-400 text-sm mt-1">
-                      57% of trading fees go directly to you. Token named after your ENS. Your NFT art becomes the token logo.
+                      57% of trading fees go directly to you. Token named after your ENS.
                     </p>
                   </div>
                   <div className={`w-12 h-6 rounded-full transition-colors flex items-center shrink-0 ml-4 ${
@@ -485,6 +519,76 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+
+              {/* ── Token logo picker (only when launch is on) ── */}
+              {launchToken && (
+                <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700 space-y-3">
+                  <p className="text-white font-semibold text-sm">🖼️ Token logo</p>
+                  <div className="flex gap-3">
+                    <button
+                      onClick={() => { setLogoMode('nft'); setCustomLogoUrl(''); setLogoPreview(null); setUploadError(null); }}
+                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${
+                        logoMode === 'nft'
+                          ? 'bg-purple-600 border-purple-500 text-white'
+                          : 'bg-gray-800 border-gray-600 text-gray-300 hover:border-gray-500'
+                      }`}
+                    >
+                      Use my NFT art
+                    </button>
+                    <button
+                      onClick={() => setLogoMode('custom')}
+                      className={`flex-1 py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${
+                        logoMode === 'custom'
+                          ? 'bg-purple-600 border-purple-500 text-white'
+                          : 'bg-gray-800 border-gray-600 text-gray-300 hover:border-gray-500'
+                      }`}
+                    >
+                      Upload custom
+                    </button>
+                  </div>
+
+                  {logoMode === 'nft' && (
+                    <p className="text-gray-500 text-xs">Your BankrClub NFT image will be used automatically.</p>
+                  )}
+
+                  {logoMode === 'custom' && (
+                    <div className="space-y-3">
+                      <label className="block cursor-pointer">
+                        <div className={`border-2 border-dashed rounded-xl p-6 text-center transition-colors ${
+                          logoPreview ? 'border-purple-500' : 'border-gray-600 hover:border-gray-500'
+                        }`}>
+                          {logoPreview ? (
+                            <div className="flex flex-col items-center gap-3">
+                              {/* eslint-disable-next-line @next/next/no-img-element */}
+                              <img src={logoPreview} alt="Logo preview" className="w-24 h-24 rounded-xl object-cover border border-gray-600" />
+                              {uploadingLogo && <p className="text-gray-400 text-sm animate-pulse">Uploading to IPFS...</p>}
+                              {!uploadingLogo && customLogoUrl && <p className="text-green-400 text-xs">✓ Uploaded to IPFS</p>}
+                              <p className="text-gray-500 text-xs">Click to change</p>
+                            </div>
+                          ) : (
+                            <div className="space-y-2">
+                              <p className="text-gray-400 text-sm">
+                                {uploadingLogo ? '⏳ Uploading...' : '📁 Click to upload image'}
+                              </p>
+                              <p className="text-gray-600 text-xs">PNG, JPG, GIF, WebP — max 5 MB</p>
+                            </div>
+                          )}
+                        </div>
+                        <input
+                          type="file"
+                          accept="image/jpeg,image/png,image/gif,image/webp,image/svg+xml"
+                          onChange={handleLogoUpload}
+                          disabled={uploadingLogo}
+                          className="hidden"
+                        />
+                      </label>
+                      {uploadError && (
+                        <p className="text-red-400 text-xs">❌ {uploadError}</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
 
               {/* ── Fee recipient selector (only shown when token launch is on) ── */}
               {launchToken && (
@@ -572,7 +676,7 @@ export default function Home() {
               {/* ── Claim button ── */}
               <button
                 onClick={handleClaim}
-                disabled={!availability?.available || claiming || !name || !feeRecipientValid}
+                disabled={!availability?.available || claiming || !name || !feeRecipientValid || uploadingLogo || (logoMode === 'custom' && !customLogoUrl)}
                 className="w-full bg-gradient-to-r from-purple-600 to-orange-600 hover:from-purple-500 hover:to-orange-500 text-white font-bold py-4 px-8 rounded-xl transition-all duration-200 transform hover:scale-[1.02] shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {claiming ? (

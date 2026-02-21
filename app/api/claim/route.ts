@@ -60,6 +60,8 @@ export async function POST(req: NextRequest) {
     feeRecipientValue,
     // Optional metadata for the Bankr token launch
     tweetUrl,
+    /** Pre-uploaded IPFS URL for the token logo (user's custom image) */
+    logoUrl,
   } = body;
 
   if (!subdomain || !address) {
@@ -172,13 +174,23 @@ export async function POST(req: NextRequest) {
         ? { type: 'wallet', value: address }
         : { type: recipientType, value: feeRecipientValue ?? address };
 
-    // Fetch the holder's NFT image to use as the token logo (best-effort)
-    const nftImage = await getNftImage(tokenId);
+    // Determine token logo: prefer user-uploaded URL, fall back to NFT art
+    let tokenImage: string | undefined;
+    if (logoUrl && typeof logoUrl === 'string') {
+      // Validate it's an IPFS or HTTPS URL we pinned
+      try {
+        const u = new URL(logoUrl);
+        if (u.protocol === 'https:' || u.protocol === 'ipfs:') tokenImage = logoUrl;
+      } catch { /* ignore invalid */ }
+    }
+    if (!tokenImage) {
+      tokenImage = await getNftImage(tokenId);
+    }
 
     const bankrResult = await launchToken(name, address, {
       feeRecipient,
       tweetUrl: validatedTweetUrl,
-      image: nftImage,
+      image: tokenImage,
     });
 
     if (bankrResult?.success) {
