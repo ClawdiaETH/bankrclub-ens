@@ -168,7 +168,7 @@ export default function Home() {
     (feeRecipientValue.trim().length > 0);
 
   const handleClaim = async () => {
-    if (!address || !availability?.available || !feeRecipientValid) return;
+    if (!address || !availability?.available || (launchToken && !feeRecipientValid)) return;
     setClaiming(true);
     setClaimError(null);
     try {
@@ -676,7 +676,7 @@ export default function Home() {
               {/* ── Claim button ── */}
               <button
                 onClick={handleClaim}
-                disabled={!availability?.available || claiming || !name || !feeRecipientValid || uploadingLogo || (logoMode === 'custom' && !customLogoUrl)}
+                disabled={!availability?.available || claiming || !name || (launchToken && !feeRecipientValid) || (launchToken && uploadingLogo) || (launchToken && logoMode === 'custom' && !customLogoUrl)}
                 className="w-full bg-gradient-to-r from-purple-600 to-orange-600 hover:from-purple-500 hover:to-orange-500 text-white font-bold py-4 px-8 rounded-xl transition-all duration-200 transform hover:scale-[1.02] shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {claiming ? (

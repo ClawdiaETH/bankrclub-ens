@@ -37,9 +37,8 @@ fi
 echo "✅ CID: $CID"
 echo "🔗 Updating bankrclub.eth contenthash..."
 
-# Encode as IPFS contenthash: e3010170 prefix + UTF-8 CID bytes
-# Note: for production use https://content-hash.now.sh to verify the encoding
-CONTENTHASH=$(python3 -c "cid='$CID'; print('0xe3010170' + cid.encode().hex())")
+# Encode as IPFS contenthash using @ensdomains/content-hash
+CONTENTHASH=$(node -e "const { encode } = require('@ensdomains/content-hash'); console.log('0x' + encode('ipfs', '$CID'))")
 
 cast send 0x4976fb03C32e5B8cfe2b6cCB31c09Ba78EBaBa41 \
   "setContenthash(bytes32,bytes)" \
