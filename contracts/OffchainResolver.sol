@@ -12,16 +12,21 @@ interface ISupportsInterface {
 /**
  * @title OffchainResolver
  * @notice EIP-3668 CCIP-Read resolver for bankrclub.eth subdomains.
- *         Handles wildcard subdomain resolution (alice.bankrclub.eth → address)
- *         via offchain gateway, plus contenthash storage for the root domain.
+ *         - contenthash() stored onchain (served directly via resolve())
+ *         - addr() and other subdomain lookups use CCIP-Read gateway
  */
 contract OffchainResolver is IExtendedResolver, ISupportsInterface {
+
+    // Function selectors
+    bytes4 private constant CONTENTHASH_SELECTOR = 0xbc1c58d1; // contenthash(bytes32)
+    bytes4 private constant ADDR_SELECTOR         = 0x3b3b57de; // addr(bytes32)
+    bytes4 private constant ADDR_MULTICHAIN       = 0xf1cb7e06; // addr(bytes32,uint256)
+
     string public url;
     address public owner;
     address public signer;
 
     mapping(bytes32 => bytes) private _contenthashes;
-    mapping(bytes32 => address) private _addresses;
 
     error OffchainLookup(
         address sender,
@@ -62,7 +67,7 @@ contract OffchainResolver is IExtendedResolver, ISupportsInterface {
         emit OwnershipTransferred(newOwner);
     }
 
-    // ── Contenthash (for bankrclub.eth.limo website hosting) ──────────────
+    // ── Contenthash (stored onchain, served instantly) ────────────────────
 
     function setContenthash(bytes32 node, bytes calldata hash) external onlyOwner {
         _contenthashes[node] = hash;
@@ -73,11 +78,20 @@ contract OffchainResolver is IExtendedResolver, ISupportsInterface {
         return _contenthashes[node];
     }
 
-    // ── CCIP-Read (for alice.bankrclub.eth → address resolution) ──────────
+    // ── IExtendedResolver: handles both contenthash and CCIP-Read ─────────
 
     function resolve(bytes calldata name, bytes calldata data)
         external view override returns (bytes memory)
     {
+        bytes4 selector = bytes4(data[:4]);
+
+        // Contenthash queries — return from storage directly (no CCIP-Read)
+        if (selector == CONTENTHASH_SELECTOR) {
+            bytes32 node = abi.decode(data[4:], (bytes32));
+            return abi.encode(_contenthashes[node]);
+        }
+
+        // Addr and all other subdomain queries — use CCIP-Read gateway
         string[] memory urls = new string[](1);
         urls[0] = string(abi.encodePacked(url, "/{sender}/{data}"));
         revert OffchainLookup(
@@ -97,44 +111,35 @@ contract OffchainResolver is IExtendedResolver, ISupportsInterface {
 
         require(validUntil >= block.timestamp, "response expired");
 
-        bytes32 messageHash = keccak256(
-            abi.encodePacked(
-                hex"1900",
-                address(this),
-                validUntil,
-                keccak256(extraData),
-                keccak256(result)
-            )
-        );
-        bytes32 ethHash = keccak256(
-            abi.encodePacked("\x19Ethereum Signed Message:\n32", messageHash)
-        );
-        address recovered = recoverSigner(ethHash, sig);
-        require(recovered == signer, "invalid signature");
+        bytes32 messageHash = keccak256(abi.encodePacked(
+            hex"1900",
+            address(this),
+            validUntil,
+            keccak256(extraData),
+            keccak256(result)
+        ));
+        bytes32 ethHash = keccak256(abi.encodePacked(
+            "\x19Ethereum Signed Message:\n32", messageHash
+        ));
+        require(recoverSigner(ethHash, sig) == signer, "invalid signature");
         return result;
     }
 
     // ── Interface support ─────────────────────────────────────────────────
 
-    function supportsInterface(bytes4 interfaceID)
-        external pure override returns (bool)
-    {
+    function supportsInterface(bytes4 interfaceID) external pure override returns (bool) {
         return
-            interfaceID == type(IExtendedResolver).interfaceId ||  // 0x9061b923
-            interfaceID == type(ISupportsInterface).interfaceId || // 0x01ffc9a7
-            interfaceID == 0xbc1c58d1 || // contenthash(bytes32)
-            interfaceID == 0x3b3b57de;   // addr(bytes32)
+            interfaceID == type(IExtendedResolver).interfaceId ||
+            interfaceID == type(ISupportsInterface).interfaceId ||
+            interfaceID == CONTENTHASH_SELECTOR ||
+            interfaceID == ADDR_SELECTOR;
     }
 
     // ── Internal ──────────────────────────────────────────────────────────
 
-    function recoverSigner(bytes32 hash, bytes memory sig)
-        internal pure returns (address)
-    {
+    function recoverSigner(bytes32 hash, bytes memory sig) internal pure returns (address) {
         require(sig.length == 65, "invalid sig length");
-        bytes32 r;
-        bytes32 s;
-        uint8 v;
+        bytes32 r; bytes32 s; uint8 v;
         assembly {
             r := mload(add(sig, 32))
             s := mload(add(sig, 64))
