@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkAvailability, createRegistration, updateTokenInfo, getRegistrationByAddress } from '@/lib/db';
 import { verifyBankrClubHolder } from '@/lib/nftVerify';
 import { launchToken } from '@/lib/bankrApi';
+import { validateName } from '@/lib/validation';
+import { ethers } from 'ethers';
 
 export const dynamic = 'force-dynamic';
 
@@ -23,22 +25,6 @@ const DISCOUNT: Record<PaymentToken, number> = {
   CLAWDIA: 0.25,
 };
 
-const RESERVED = [
-  'bankr', 'admin', 'www', 'api', 'app', 'mail',
-  'help', 'support', 'team', 'clawdia',
-];
-
-function validateName(name: string): { valid: boolean; reason?: string } {
-  if (!name || name.length < 3) return { valid: false, reason: 'minimum 3 characters' };
-  if (name.length > 32) return { valid: false, reason: 'maximum 32 characters' };
-  if (!/^[a-z0-9-]+$/.test(name))
-    return { valid: false, reason: 'lowercase letters, numbers, hyphens only' };
-  if (name.startsWith('-') || name.endsWith('-'))
-    return { valid: false, reason: 'cannot start or end with hyphen' };
-  if (RESERVED.includes(name)) return { valid: false, reason: 'reserved name' };
-  return { valid: true };
-}
-
 function getPremiumPrice(name: string): number {
   if (name.length === 3) return 0.05;
   if (name.length === 4) return 0.02;
@@ -47,11 +33,18 @@ function getPremiumPrice(name: string): number {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { subdomain, address, launchTokenOnBankr, paymentToken } = body;
+  const { subdomain, address, launchTokenOnBankr, paymentToken, signature } = body;
 
   if (!subdomain || !address) {
     return NextResponse.json(
       { error: 'subdomain and address required' },
+      { status: 400, headers: corsHeaders }
+    );
+  }
+
+  if (!signature) {
+    return NextResponse.json(
+      { error: 'signature required to prove wallet ownership' },
       { status: 400, headers: corsHeaders }
     );
   }
@@ -65,6 +58,23 @@ export async function POST(req: NextRequest) {
   if (!validation.valid) {
     return NextResponse.json(
       { error: validation.reason },
+      { status: 400, headers: corsHeaders }
+    );
+  }
+
+  // Verify wallet ownership via signature
+  const message = `Claim subdomain: ${name}.bankrclub.eth`;
+  try {
+    const recoveredAddress = ethers.verifyMessage(message, signature);
+    if (recoveredAddress.toLowerCase() !== address.toLowerCase()) {
+      return NextResponse.json(
+        { error: 'signature does not match claimed address' },
+        { status: 401, headers: corsHeaders }
+      );
+    }
+  } catch {
+    return NextResponse.json(
+      { error: 'invalid signature' },
       { status: 400, headers: corsHeaders }
     );
   }

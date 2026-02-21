@@ -12,12 +12,15 @@ export async function signResponse(
   validUntil: number,
   signingKey: string
 ): Promise<string> {
+  const resolverAddress = process.env.RESOLVER_CONTRACT_ADDRESS;
+  if (!resolverAddress) {
+    throw new Error('RESOLVER_CONTRACT_ADDRESS environment variable is required for CCIP-Read signing');
+  }
   const messageHash = ethers.solidityPackedKeccak256(
     ['bytes', 'address', 'uint64', 'bytes32', 'bytes32'],
     [
       '0x1900',
-      // This would be the resolver contract address — placeholder for now
-      process.env.RESOLVER_CONTRACT_ADDRESS || ethers.ZeroAddress,
+      resolverAddress,
       validUntil,
       ethers.keccak256(requestData),
       ethers.keccak256(result),

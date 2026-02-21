@@ -44,3 +44,7 @@ next-env.d.ts
 # IDE
 .vscode
 .idea
+
+# Foundry
+cache/
+out/
