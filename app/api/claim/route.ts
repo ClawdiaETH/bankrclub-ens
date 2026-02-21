@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkAvailability, createRegistration, updateTokenInfo } from '@/lib/db';
+import { checkAvailability, createRegistration, updateTokenInfo, getRegistrationByAddress } from '@/lib/db';
 import { verifyBankrClubHolder } from '@/lib/nftVerify';
 import { launchToken } from '@/lib/bankrApi';
 
@@ -23,6 +23,22 @@ const DISCOUNT: Record<PaymentToken, number> = {
   CLAWDIA: 0.25,
 };
 
+const RESERVED = [
+  'bankr', 'admin', 'www', 'api', 'app', 'mail',
+  'help', 'support', 'team', 'clawdia',
+];
+
+function validateName(name: string): { valid: boolean; reason?: string } {
+  if (!name || name.length < 3) return { valid: false, reason: 'minimum 3 characters' };
+  if (name.length > 32) return { valid: false, reason: 'maximum 32 characters' };
+  if (!/^[a-z0-9-]+$/.test(name))
+    return { valid: false, reason: 'lowercase letters, numbers, hyphens only' };
+  if (name.startsWith('-') || name.endsWith('-'))
+    return { valid: false, reason: 'cannot start or end with hyphen' };
+  if (RESERVED.includes(name)) return { valid: false, reason: 'reserved name' };
+  return { valid: true };
+}
+
 function getPremiumPrice(name: string): number {
   if (name.length === 3) return 0.05;
   if (name.length === 4) return 0.02;
@@ -44,10 +60,33 @@ export async function POST(req: NextRequest) {
   const token: PaymentToken =
     paymentToken === 'BNKR' || paymentToken === 'CLAWDIA' ? paymentToken : 'ETH';
 
+  // Validate name format
+  const validation = validateName(name);
+  if (!validation.valid) {
+    return NextResponse.json(
+      { error: validation.reason },
+      { status: 400, headers: corsHeaders }
+    );
+  }
+
   // Verify NFT ownership
   const { isHolder, tokenId } = await verifyBankrClubHolder(address);
   if (!isHolder) {
     return NextResponse.json({ error: 'BankrClub NFT required' }, { status: 403, headers: corsHeaders });
+  }
+
+  // Enforce one-per-wallet restriction
+  try {
+    const existingRegistration = await getRegistrationByAddress(address);
+    if (existingRegistration) {
+      return NextResponse.json(
+        { error: 'one name per wallet - you already have a registration' },
+        { status: 409, headers: corsHeaders }
+      );
+    }
+  } catch (e) {
+    console.error('Wallet check failed:', e);
+    return NextResponse.json({ error: 'wallet check failed' }, { status: 500, headers: corsHeaders });
   }
 
   // Check availability
@@ -58,6 +97,7 @@ export async function POST(req: NextRequest) {
     }
   } catch (e) {
     console.error('DB check failed:', e);
+    return NextResponse.json({ error: 'availability check failed' }, { status: 500, headers: corsHeaders });
   }
 
   // Calculate discounted price for logging
@@ -69,10 +109,11 @@ export async function POST(req: NextRequest) {
     console.log(
       `Premium claim: ${name} | base=${basePrice} ETH | token=${token} | paid=${discountedPrice} ETH`
     );
+    return NextResponse.json(
+      { error: 'premium names (5 characters or less) require payment verification - coming soon' },
+      { status: 400, headers: corsHeaders }
+    );
   }
-
-  // TODO Phase 2: verify on-chain payment before registering premium names
-  // For now, record payment intent and trust frontend validation
 
   // Register
   let registration: Record<string, unknown>;
