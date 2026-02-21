@@ -6,6 +6,7 @@ import { useAccount, useReadContract } from 'wagmi';
 import TypewriterSubdomain from './TypewriterSubdomain';
 import PaymentSelector, { PaymentToken } from './PaymentSelector';
 import { getDiscountTokenBalances, TokenBalances } from '@/lib/tokenBalances';
+import type { FeeRecipientType } from '@/lib/bankrApi';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
 
@@ -25,13 +26,17 @@ interface AvailabilityResult {
   available: boolean;
   isPremium?: boolean;
   price?: number;
-  prices?: {
-    eth: number;
-    bnkr: number;
-    clawdia: number;
-  };
+  prices?: { eth: number; bnkr: number; clawdia: number };
   reason?: string;
   name?: string;
+}
+
+interface FeeDistribution {
+  creator: { address: string; bps: number };
+  bankr: { address: string; bps: number };
+  partner: { address: string; bps: number };
+  ecosystem: { address: string; bps: number };
+  protocol: { address: string; bps: number };
 }
 
 interface ClaimResult {
@@ -46,7 +51,20 @@ interface ClaimResult {
     poolId: string;
     txHash?: string;
     simulated?: boolean;
+    feeDistribution?: FeeDistribution;
+    feeRecipient?: { type: FeeRecipientType; value: string };
   } | null;
+}
+
+const FEE_RECIPIENT_OPTIONS: { type: FeeRecipientType; label: string; placeholder: string; hint: string }[] = [
+  { type: 'wallet', label: 'My wallet', placeholder: '', hint: 'Fees go to your connected wallet' },
+  { type: 'x', label: 'Twitter/X', placeholder: 'username (no @)', hint: 'Resolves to your Bankr wallet via X handle' },
+  { type: 'farcaster', label: 'Farcaster', placeholder: 'username.eth or handle', hint: 'Resolves to your verified EVM address' },
+  { type: 'ens', label: 'ENS', placeholder: 'yourname.eth', hint: 'Resolves to the underlying address' },
+];
+
+function bpsToPercent(bps: number) {
+  return (bps / 100).toFixed(2).replace(/\.00$/, '');
 }
 
 export default function Home() {
@@ -75,6 +93,14 @@ export default function Home() {
   const [paymentToken, setPaymentToken] = useState<PaymentToken>('ETH');
   const [tokenBalances, setTokenBalances] = useState<TokenBalances | null>(null);
 
+  // Fee recipient state
+  const [feeRecipientType, setFeeRecipientType] = useState<FeeRecipientType>('wallet');
+  const [feeRecipientValue, setFeeRecipientValue] = useState('');
+
+  // Advanced options state
+  const [showAdvanced, setShowAdvanced] = useState(false);
+  const [tweetUrl, setTweetUrl] = useState('');
+
   // Fetch discount token balances once wallet is verified as holder
   useEffect(() => {
     if (!address || !isHolder) {
@@ -84,9 +110,11 @@ export default function Home() {
     getDiscountTokenBalances(address).then(setTokenBalances).catch(() => setTokenBalances(null));
   }, [address, isHolder]);
 
-  // Reset payment token when balances arrive (avoid stale selection)
+  // Reset state when wallet changes
   useEffect(() => {
     setPaymentToken('ETH');
+    setFeeRecipientType('wallet');
+    setFeeRecipientValue('');
   }, [address]);
 
   // Debounced availability check
@@ -117,7 +145,7 @@ export default function Home() {
     return () => clearTimeout(timer);
   }, [name, checkAvailability]);
 
-  // Compute the final price to display based on selected payment token
+  // Compute displayed price
   const displayPrice = (() => {
     if (!availability?.isPremium || !availability.price) return null;
     if (availability.prices) {
@@ -127,8 +155,13 @@ export default function Home() {
     return availability.price;
   })();
 
+  // Validate fee recipient value for non-wallet types
+  const feeRecipientValid =
+    feeRecipientType === 'wallet' ||
+    (feeRecipientValue.trim().length > 0);
+
   const handleClaim = async () => {
-    if (!address || !availability?.available) return;
+    if (!address || !availability?.available || !feeRecipientValid) return;
     setClaiming(true);
     setClaimError(null);
     try {
@@ -140,6 +173,9 @@ export default function Home() {
           address,
           launchTokenOnBankr: launchToken,
           paymentToken,
+          feeRecipientType,
+          feeRecipientValue: feeRecipientType === 'wallet' ? address : feeRecipientValue.trim(),
+          tweetUrl: tweetUrl.trim() || undefined,
         }),
       });
       const data = await res.json();
@@ -160,6 +196,8 @@ export default function Home() {
     if (claimResult?.paymentToken === 'CLAWDIA') return 'Paid with $CLAWDIA — 25% off!';
     return null;
   })();
+
+  const selectedFeeOption = FEE_RECIPIENT_OPTIONS.find(o => o.type === feeRecipientType)!;
 
   return (
     <main className="min-h-screen bg-gray-900 text-white">
@@ -211,7 +249,7 @@ export default function Home() {
             </div>
           </div>
 
-          {/* State: Success */}
+          {/* ── State: Success ── */}
           {claimResult && (
             <div className="p-8 space-y-6">
               <div className="text-center space-y-4">
@@ -229,29 +267,63 @@ export default function Home() {
                   </div>
                 )}
                 {claimResult.tokenInfo && (
-                  <div className="bg-gray-800 rounded-xl p-6 border border-orange-500 space-y-3">
-                    <p className="text-orange-400 font-semibold">
+                  <div className="bg-gray-800 rounded-xl p-6 border border-orange-500 space-y-3 text-left">
+                    <p className="text-orange-400 font-semibold text-center">
                       🚀 Token launched on Bankr!
                     </p>
                     {claimResult.tokenInfo.simulated && (
-                      <p className="text-yellow-400 text-sm">
-                        ⚠️ Simulated (no partner key yet — token not live)
+                      <p className="text-yellow-400 text-sm text-center">
+                        ⚠️ Simulated — token not live yet (partner key pending)
                       </p>
                     )}
                     {claimResult.tokenInfo.tokenAddress && (
                       <div>
-                        <p className="text-gray-400 text-sm">Token address</p>
+                        <p className="text-gray-400 text-xs">Token address</p>
                         <p className="font-mono text-white text-sm break-all">
                           {claimResult.tokenInfo.tokenAddress}
                         </p>
                       </div>
                     )}
-                    {claimResult.tokenInfo.poolId && (
+                    {claimResult.tokenInfo.feeRecipient && claimResult.tokenInfo.feeRecipient.type !== 'wallet' && (
+                      <div>
+                        <p className="text-gray-400 text-xs">Trading fees routed to</p>
+                        <p className="text-white text-sm">
+                          {claimResult.tokenInfo.feeRecipient.type === 'x' && '𝕏 '}
+                          {claimResult.tokenInfo.feeRecipient.type === 'farcaster' && '🟣 '}
+                          {claimResult.tokenInfo.feeRecipient.type === 'ens' && '🔷 '}
+                          {claimResult.tokenInfo.feeRecipient.value}
+                        </p>
+                      </div>
+                    )}
+                    {claimResult.tokenInfo.feeDistribution && (
+                      <div className="pt-2 border-t border-gray-700">
+                        <p className="text-gray-400 text-xs mb-2">Fee distribution (1.2% per swap)</p>
+                        <div className="grid grid-cols-2 gap-1 text-xs">
+                          <span className="text-gray-400">You (creator)</span>
+                          <span className="text-green-400 font-semibold">
+                            {bpsToPercent(claimResult.tokenInfo.feeDistribution.creator.bps)}%
+                          </span>
+                          <span className="text-gray-400">Partner</span>
+                          <span className="text-orange-400">
+                            {bpsToPercent(claimResult.tokenInfo.feeDistribution.partner.bps)}%
+                          </span>
+                          <span className="text-gray-400">Bankr</span>
+                          <span className="text-gray-300">
+                            {bpsToPercent(claimResult.tokenInfo.feeDistribution.bankr.bps)}%
+                          </span>
+                          <span className="text-gray-400">Protocol</span>
+                          <span className="text-gray-300">
+                            {bpsToPercent(claimResult.tokenInfo.feeDistribution.protocol.bps)}%
+                          </span>
+                        </div>
+                      </div>
+                    )}
+                    {claimResult.tokenInfo.poolId && !claimResult.tokenInfo.simulated && (
                       <a
                         href={`https://dexscreener.com/base/${claimResult.tokenInfo.poolId}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="inline-block bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                        className="block text-center bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 px-4 rounded-lg transition-colors"
                       >
                         View on Dexscreener →
                       </a>
@@ -270,10 +342,9 @@ export default function Home() {
             </div>
           )}
 
-          {/* State: Not connected */}
+          {/* ── State: Not connected ── */}
           {!isConnected && !claimResult && (
             <>
-              {/* Features Grid */}
               <div className="grid md:grid-cols-3 gap-6 p-8">
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
                   <div className="text-3xl mb-3">🆓</div>
@@ -297,7 +368,7 @@ export default function Home() {
             </>
           )}
 
-          {/* State: Connected, not holder */}
+          {/* ── State: Connected, not holder ── */}
           {isConnected && !isHolder && !claimResult && (
             <div className="p-8 text-center space-y-6">
               <div className="text-5xl">🔒</div>
@@ -325,7 +396,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* State: Connected + holder — Claim form */}
+          {/* ── State: Connected + holder — Claim form ── */}
           {isConnected && isHolder && !claimResult && (
             <div className="p-8 space-y-6">
               <div className="flex items-center justify-between mb-2">
@@ -336,11 +407,9 @@ export default function Home() {
                 ✅ BankrClub NFT holder verified
               </div>
 
-              {/* Name input */}
+              {/* ── Name input ── */}
               <div>
-                <label className="block text-gray-400 text-sm mb-2">
-                  Choose your name
-                </label>
+                <label className="block text-gray-400 text-sm mb-2">Choose your name</label>
                 <div className="flex items-center gap-3">
                   <div className="relative flex-1">
                     <input
@@ -352,9 +421,7 @@ export default function Home() {
                       className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 font-mono text-lg"
                     />
                     {checkingAvailability && (
-                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-pulse">
-                        ...
-                      </span>
+                      <span className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 animate-pulse">...</span>
                     )}
                     {!checkingAvailability && availability && (
                       <span className={`absolute right-3 top-1/2 -translate-y-1/2 text-lg ${
@@ -366,15 +433,12 @@ export default function Home() {
                   </div>
                   <span className="text-gray-400 font-mono whitespace-nowrap">.bankrclub.eth</span>
                 </div>
-
-                {/* Availability status */}
                 {availability && !checkingAvailability && (
-                  <div className={`mt-2 text-sm ${
-                    availability.available ? 'text-green-400' : 'text-red-400'
-                  }`}>
+                  <div className={`mt-2 text-sm ${availability.available ? 'text-green-400' : 'text-red-400'}`}>
                     {availability.available ? (
                       <>
-                        ✓ Available{availability.isPremium && ` — Premium name (${displayPrice ?? availability.price} ETH)`}
+                        ✓ Available
+                        {availability.isPremium && ` — Premium name (${displayPrice ?? availability.price} ETH)`}
                         {!availability.isPremium && ' — Free!'}
                       </>
                     ) : (
@@ -387,7 +451,7 @@ export default function Home() {
                 )}
               </div>
 
-              {/* Payment selector — only for premium names */}
+              {/* ── Payment selector (premium only) ── */}
               {availability?.available && availability.isPremium && availability.price && (
                 <PaymentSelector
                   basePrice={availability.price}
@@ -398,7 +462,7 @@ export default function Home() {
                 />
               )}
 
-              {/* Token launch toggle */}
+              {/* ── Token launch toggle ── */}
               <div
                 className={`bg-gray-800/50 rounded-xl p-5 border cursor-pointer transition-colors ${
                   launchToken ? 'border-orange-500' : 'border-gray-700'
@@ -409,10 +473,10 @@ export default function Home() {
                   <div>
                     <p className="text-white font-semibold">🚀 Launch my token on Bankr</p>
                     <p className="text-gray-400 text-sm mt-1">
-                      57% of trading fees go directly to you. Token named after your ENS.
+                      57% of trading fees go directly to you. Token named after your ENS. Your NFT art becomes the token logo.
                     </p>
                   </div>
-                  <div className={`w-12 h-6 rounded-full transition-colors flex items-center ${
+                  <div className={`w-12 h-6 rounded-full transition-colors flex items-center shrink-0 ml-4 ${
                     launchToken ? 'bg-orange-500' : 'bg-gray-600'
                   }`}>
                     <div className={`w-5 h-5 bg-white rounded-full shadow transition-transform mx-0.5 ${
@@ -422,17 +486,93 @@ export default function Home() {
                 </div>
               </div>
 
-              {/* Error */}
+              {/* ── Fee recipient selector (only shown when token launch is on) ── */}
+              {launchToken && (
+                <div className="bg-gray-800/50 rounded-xl p-5 border border-gray-700 space-y-4">
+                  <div>
+                    <p className="text-white font-semibold text-sm mb-1">💸 Who receives trading fees?</p>
+                    <p className="text-gray-500 text-xs">{selectedFeeOption.hint}</p>
+                  </div>
+                  <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {FEE_RECIPIENT_OPTIONS.map((opt) => (
+                      <button
+                        key={opt.type}
+                        onClick={() => {
+                          setFeeRecipientType(opt.type);
+                          setFeeRecipientValue('');
+                        }}
+                        className={`py-2 px-3 rounded-lg text-sm font-medium border transition-colors ${
+                          feeRecipientType === opt.type
+                            ? 'bg-purple-600 border-purple-500 text-white'
+                            : 'bg-gray-800 border-gray-600 text-gray-300 hover:border-gray-500'
+                        }`}
+                      >
+                        {opt.type === 'wallet' && '🏦 '}
+                        {opt.type === 'x' && '𝕏 '}
+                        {opt.type === 'farcaster' && '🟣 '}
+                        {opt.type === 'ens' && '🔷 '}
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                  {feeRecipientType !== 'wallet' && (
+                    <input
+                      type="text"
+                      value={feeRecipientValue}
+                      onChange={(e) => setFeeRecipientValue(e.target.value)}
+                      placeholder={selectedFeeOption.placeholder}
+                      className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-sm"
+                    />
+                  )}
+                  {feeRecipientType === 'wallet' && address && (
+                    <p className="font-mono text-gray-500 text-xs break-all">{address}</p>
+                  )}
+                </div>
+              )}
+
+              {/* ── Advanced options ── */}
+              {launchToken && (
+                <div>
+                  <button
+                    onClick={() => setShowAdvanced(!showAdvanced)}
+                    className="text-gray-500 hover:text-gray-300 text-sm flex items-center gap-1 transition-colors"
+                  >
+                    <span>{showAdvanced ? '▾' : '▸'}</span>
+                    Advanced options
+                  </button>
+                  {showAdvanced && (
+                    <div className="mt-3 bg-gray-800/50 rounded-xl p-5 border border-gray-700 space-y-3">
+                      <div>
+                        <label className="block text-gray-400 text-sm mb-1">
+                          Tweet URL <span className="text-gray-600">(optional)</span>
+                        </label>
+                        <input
+                          type="url"
+                          value={tweetUrl}
+                          onChange={(e) => setTweetUrl(e.target.value)}
+                          placeholder="https://x.com/yourhandle/status/..."
+                          className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white placeholder-gray-500 focus:outline-none focus:border-purple-500 text-sm"
+                        />
+                        <p className="text-gray-500 text-xs mt-1">
+                          Link a tweet about your token — stored in on-chain metadata.
+                        </p>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* ── Error ── */}
               {claimError && (
                 <div className="bg-red-900/30 border border-red-700 rounded-xl p-4 text-sm text-red-400">
                   ❌ {claimError}
                 </div>
               )}
 
-              {/* Claim button */}
+              {/* ── Claim button ── */}
               <button
                 onClick={handleClaim}
-                disabled={!availability?.available || claiming || !name}
+                disabled={!availability?.available || claiming || !name || !feeRecipientValid}
                 className="w-full bg-gradient-to-r from-purple-600 to-orange-600 hover:from-purple-500 hover:to-orange-500 text-white font-bold py-4 px-8 rounded-xl transition-all duration-200 transform hover:scale-[1.02] shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {claiming ? (
@@ -450,7 +590,7 @@ export default function Home() {
             </div>
           )}
 
-          {/* Footer */}
+          {/* ── Footer ── */}
           <div className="bg-gray-800/30 border-t border-gray-700 p-6 text-center space-y-2">
             <p className="text-gray-400 text-sm">
               Built by{' '}
