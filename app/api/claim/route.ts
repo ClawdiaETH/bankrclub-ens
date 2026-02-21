@@ -3,6 +3,8 @@ import { checkAvailability, createRegistration, updateTokenInfo } from '@/lib/db
 import { verifyBankrClubHolder } from '@/lib/nftVerify';
 import { launchToken } from '@/lib/bankrApi';
 
+export const dynamic = 'force-dynamic';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',

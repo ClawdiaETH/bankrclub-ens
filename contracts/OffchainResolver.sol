@@ -12,12 +12,16 @@ interface ISupportsInterface {
 /**
  * @title OffchainResolver
  * @notice EIP-3668 CCIP-Read resolver for bankrclub.eth subdomains.
- *         Resolves subdomains by querying the offchain gateway (Next.js API).
+ *         Handles wildcard subdomain resolution (alice.bankrclub.eth → address)
+ *         via offchain gateway, plus contenthash storage for the root domain.
  */
 contract OffchainResolver is IExtendedResolver, ISupportsInterface {
     string public url;
     address public owner;
     address public signer;
+
+    mapping(bytes32 => bytes) private _contenthashes;
+    mapping(bytes32 => address) private _addresses;
 
     error OffchainLookup(
         address sender,
@@ -29,6 +33,8 @@ contract OffchainResolver is IExtendedResolver, ISupportsInterface {
 
     event SignerUpdated(address indexed newSigner);
     event UrlUpdated(string newUrl);
+    event ContenthashUpdated(bytes32 indexed node, bytes contenthash);
+    event OwnershipTransferred(address indexed newOwner);
 
     constructor(string memory _url, address _signer) {
         url = _url;
@@ -53,13 +59,24 @@ contract OffchainResolver is IExtendedResolver, ISupportsInterface {
 
     function transferOwnership(address newOwner) external onlyOwner {
         owner = newOwner;
+        emit OwnershipTransferred(newOwner);
     }
 
+    // ── Contenthash (for bankrclub.eth.limo website hosting) ──────────────
+
+    function setContenthash(bytes32 node, bytes calldata hash) external onlyOwner {
+        _contenthashes[node] = hash;
+        emit ContenthashUpdated(node, hash);
+    }
+
+    function contenthash(bytes32 node) external view returns (bytes memory) {
+        return _contenthashes[node];
+    }
+
+    // ── CCIP-Read (for alice.bankrclub.eth → address resolution) ──────────
+
     function resolve(bytes calldata name, bytes calldata data)
-        external
-        view
-        override
-        returns (bytes memory)
+        external view override returns (bytes memory)
     {
         string[] memory urls = new string[](1);
         urls[0] = string(abi.encodePacked(url, "/{sender}/{data}"));
@@ -73,9 +90,7 @@ contract OffchainResolver is IExtendedResolver, ISupportsInterface {
     }
 
     function resolveWithProof(bytes calldata response, bytes calldata extraData)
-        external
-        view
-        returns (bytes memory)
+        external view returns (bytes memory)
     {
         (bytes memory result, uint64 validUntil, bytes memory sig) =
             abi.decode(response, (bytes, uint64, bytes));
@@ -99,13 +114,23 @@ contract OffchainResolver is IExtendedResolver, ISupportsInterface {
         return result;
     }
 
-    function supportsInterface(bytes4 interfaceID) external pure override returns (bool) {
+    // ── Interface support ─────────────────────────────────────────────────
+
+    function supportsInterface(bytes4 interfaceID)
+        external pure override returns (bool)
+    {
         return
-            interfaceID == type(IExtendedResolver).interfaceId ||
-            interfaceID == type(ISupportsInterface).interfaceId;
+            interfaceID == type(IExtendedResolver).interfaceId ||  // 0x9061b923
+            interfaceID == type(ISupportsInterface).interfaceId || // 0x01ffc9a7
+            interfaceID == 0xbc1c58d1 || // contenthash(bytes32)
+            interfaceID == 0x3b3b57de;   // addr(bytes32)
     }
 
-    function recoverSigner(bytes32 hash, bytes memory sig) internal pure returns (address) {
+    // ── Internal ──────────────────────────────────────────────────────────
+
+    function recoverSigner(bytes32 hash, bytes memory sig)
+        internal pure returns (address)
+    {
         require(sig.length == 65, "invalid sig length");
         bytes32 r;
         bytes32 s;

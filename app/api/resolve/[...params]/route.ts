@@ -3,6 +3,8 @@ import { getRegistration } from '@/lib/db';
 import { encodeResult, signResponse, parseSubdomainFromCalldata } from '@/lib/ensResolver';
 import { ethers } from 'ethers';
 
+export const dynamic = 'force-dynamic';
+
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Methods': 'GET, POST, OPTIONS',

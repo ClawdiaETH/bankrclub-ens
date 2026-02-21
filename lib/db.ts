@@ -1,34 +1,26 @@
 import { neon } from '@neondatabase/serverless';
 
-const sql = neon(process.env.POSTGRES_URL!);
-
-// Schema (run once via /api/init-db):
-// CREATE TABLE IF NOT EXISTS registrations (
-//   id SERIAL PRIMARY KEY,
-//   subdomain VARCHAR(255) UNIQUE NOT NULL,
-//   address VARCHAR(42) NOT NULL,
-//   token_id INTEGER,
-//   bankr_token_address VARCHAR(42),
-//   bankr_token_symbol VARCHAR(10),
-//   bankr_pool_id VARCHAR(66),
-//   bankr_tx_hash VARCHAR(66),
-//   registered_at TIMESTAMP DEFAULT NOW(),
-//   is_premium BOOLEAN DEFAULT FALSE,
-//   premium_paid_eth DECIMAL(18,8),
-//   payment_token VARCHAR(10) DEFAULT 'ETH'
-// );
+// Lazy connection — only initializes when actually queried (not at module load)
+function getDb() {
+  const url = process.env.POSTGRES_URL;
+  if (!url) throw new Error('POSTGRES_URL not set');
+  return neon(url);
+}
 
 export async function checkAvailability(subdomain: string): Promise<boolean> {
+  const sql = getDb();
   const rows = await sql`SELECT id FROM registrations WHERE subdomain = ${subdomain}`;
   return rows.length === 0;
 }
 
 export async function getRegistration(subdomain: string) {
+  const sql = getDb();
   const rows = await sql`SELECT * FROM registrations WHERE subdomain = ${subdomain}`;
   return rows[0] || null;
 }
 
 export async function getRegistrationByAddress(address: string) {
+  const sql = getDb();
   const rows = await sql`SELECT * FROM registrations WHERE LOWER(address) = LOWER(${address}) LIMIT 1`;
   return rows[0] || null;
 }
@@ -41,6 +33,7 @@ export async function createRegistration(data: {
   paymentToken?: string;
   premiumPaidEth?: number;
 }) {
+  const sql = getDb();
   const rows = await sql`
     INSERT INTO registrations (subdomain, address, token_id, is_premium, payment_token, premium_paid_eth)
     VALUES (
@@ -65,6 +58,7 @@ export async function updateTokenInfo(
     bankrTxHash: string;
   }
 ) {
+  const sql = getDb();
   await sql`
     UPDATE registrations SET
       bankr_token_address = ${tokenInfo.bankrTokenAddress},
@@ -76,6 +70,7 @@ export async function updateTokenInfo(
 }
 
 export async function getRecentRegistrations(limit = 10) {
+  const sql = getDb();
   const rows = await sql`
     SELECT subdomain, address, bankr_token_address, bankr_token_symbol, registered_at
     FROM registrations ORDER BY registered_at DESC LIMIT ${limit}
