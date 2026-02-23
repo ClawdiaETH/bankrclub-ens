@@ -24,6 +24,7 @@ echo "🔨 Building static export..."
 rm -rf .next out
 
 # Temporarily hide API routes (force-dynamic not compatible with static export)
+trap 'mv /tmp/api-routes-bak-deploy app/api 2>/dev/null' EXIT
 mv app/api /tmp/api-routes-bak-deploy
 
 NEXT_PUBLIC_IPFS_BUILD=true \
@@ -55,7 +56,7 @@ const files = walkDir(OUT_DIR);
 const formData = new FormData();
 for (const file of files) {
   const rel = path.relative(OUT_DIR, file);
-  formData.append('file', new File([fs.readFileSync(file)], `bankrclub-ens/${rel}`));
+  formData.append('file', new File([fs.readFileSync(file)], rel));
 }
 formData.append('pinataMetadata', JSON.stringify({ name: 'bankrclub-ens' }));
 formData.append('pinataOptions', JSON.stringify({ cidVersion: 0, wrapWithDirectory: true }));
@@ -91,13 +92,25 @@ console.log('0x' + Buffer.concat([prefix, decoded]).toString('hex'));
 echo "Contenthash: $CONTENTHASH"
 
 echo "⛓️  Setting contenthash on ENS resolver..."
-TX=$(cast send "$RESOLVER" \
+CAST_OUTPUT=$(cast send "$RESOLVER" \
   "setContenthash(bytes32,bytes)" \
   "$(cast namehash bankrclub.eth)" \
   "$CONTENTHASH" \
   --private-key "$SIGNING_KEY" \
   --rpc-url "$RPC" \
-  --json | python3 -c "import sys,json; print(json.load(sys.stdin).get('transactionHash','(see above)'))" 2>/dev/null || echo "(check output above)")
+  --json)
+CAST_EXIT=$?
+if [ $CAST_EXIT -ne 0 ]; then
+  echo "❌ cast send failed (exit code $CAST_EXIT)"
+  echo "$CAST_OUTPUT"
+  exit 1
+fi
+TX=$(echo "$CAST_OUTPUT" | python3 -c "import sys,json; print(json.load(sys.stdin).get('transactionHash',''))")
+if [ -z "$TX" ]; then
+  echo "❌ Failed to extract transaction hash from cast output"
+  echo "$CAST_OUTPUT"
+  exit 1
+fi
 
 echo ""
 echo "🚀 Deployed!"
