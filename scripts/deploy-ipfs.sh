@@ -25,6 +25,7 @@ rm -rf .next out
 
 # Temporarily hide API routes (force-dynamic not compatible with static export)
 trap 'mv /tmp/api-routes-bak-deploy app/api 2>/dev/null' EXIT
+rm -rf /tmp/api-routes-bak-deploy
 mv app/api /tmp/api-routes-bak-deploy
 
 NEXT_PUBLIC_IPFS_BUILD=true \
