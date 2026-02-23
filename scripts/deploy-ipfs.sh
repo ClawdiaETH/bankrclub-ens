@@ -92,6 +92,7 @@ console.log('0x' + Buffer.concat([prefix, decoded]).toString('hex'));
 echo "Contenthash: $CONTENTHASH"
 
 echo "⛓️  Setting contenthash on ENS resolver..."
+set +e
 CAST_OUTPUT=$(cast send "$RESOLVER" \
   "setContenthash(bytes32,bytes)" \
   "$(cast namehash bankrclub.eth)" \
@@ -100,6 +101,7 @@ CAST_OUTPUT=$(cast send "$RESOLVER" \
   --rpc-url "$RPC" \
   --json)
 CAST_EXIT=$?
+set -e
 if [ $CAST_EXIT -ne 0 ]; then
   echo "❌ cast send failed (exit code $CAST_EXIT)"
   echo "$CAST_OUTPUT"
