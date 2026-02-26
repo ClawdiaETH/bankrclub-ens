@@ -78,7 +78,15 @@ export default function PaymentSelector({
               <span className="text-orange-400 font-mono font-bold text-lg">{bnkrPrice} ETH</span>
             </div>
           ) : (
-            <p className="text-gray-500 text-xs mt-1 italic">need $BNKR to unlock</p>
+            <a
+              href="https://bankr.bot/launches/0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-orange-400 text-xs mt-1 hover:text-orange-300 underline transition-colors"
+            >
+              Buy $BNKR to unlock →
+            </a>
           )}
         </button>
 
@@ -123,7 +131,15 @@ export default function PaymentSelector({
               </span>
             </div>
           ) : (
-            <p className="text-gray-500 text-xs mt-1 italic">need $CLAWDIA to unlock</p>
+            <a
+              href="https://bankr.bot/launches/0xbbd9aDe16525acb4B336b6dAd3b9762901522B07"
+              target="_blank"
+              rel="noopener noreferrer"
+              onClick={(e) => e.stopPropagation()}
+              className="text-purple-400 text-xs mt-1 hover:text-purple-300 underline transition-colors"
+            >
+              Buy $CLAWDIA to unlock →
+            </a>
           )}
         </button>
       </div>

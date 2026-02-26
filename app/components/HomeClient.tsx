@@ -521,7 +521,34 @@ export default function Home() {
 
               {/* ── Name input ── */}
               <div>
-                <label className="block text-gray-400 text-sm mb-2">Choose your name</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-gray-400 text-sm">Choose your name</label>
+                  <details className="group relative">
+                    <summary className="text-gray-500 text-xs cursor-pointer hover:text-gray-300 transition-colors list-none select-none">
+                      Pricing ▾
+                    </summary>
+                    <div className="absolute right-0 top-6 z-10 bg-gray-800 border border-gray-700 rounded-xl p-3 shadow-xl w-64 text-xs">
+                      <p className="text-gray-400 font-semibold mb-2">Name pricing</p>
+                      <div className="grid grid-cols-3 gap-x-3 gap-y-1">
+                        <span className="text-gray-500">Length</span>
+                        <span className="text-gray-500">ETH</span>
+                        <span className="text-gray-500">Best price</span>
+                        <span className="text-gray-300">3 chars</span><span className="text-white">0.05</span><span className="text-purple-400">0.0375 ($CLAWDIA)</span>
+                        <span className="text-gray-300">4 chars</span><span className="text-white">0.02</span><span className="text-purple-400">0.015</span>
+                        <span className="text-gray-300">5 chars</span><span className="text-white">0.01</span><span className="text-purple-400">0.0075</span>
+                        <span className="text-gray-300">6 chars</span><span className="text-white">0.005</span><span className="text-purple-400">0.00375</span>
+                        <span className="text-gray-300">7 chars</span><span className="text-white">0.003</span><span className="text-purple-400">0.00225</span>
+                        <span className="text-gray-300">8 chars</span><span className="text-white">0.002</span><span className="text-purple-400">0.0015</span>
+                        <span className="text-green-400 font-semibold">9+ chars</span><span className="text-green-400 font-semibold col-span-2">Free!</span>
+                      </div>
+                      <div className="mt-3 pt-2 border-t border-gray-700 space-y-1">
+                        <p className="text-gray-500">Discounts (hold to unlock):</p>
+                        <p className="text-orange-400">$BNKR — 10% off · <a href="https://bankr.bot/launches/0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b" target="_blank" rel="noopener noreferrer" className="underline hover:text-orange-300">Buy →</a></p>
+                        <p className="text-purple-400">$CLAWDIA — 25% off · <a href="https://bankr.bot/launches/0xbbd9aDe16525acb4B336b6dAd3b9762901522B07" target="_blank" rel="noopener noreferrer" className="underline hover:text-purple-300">Buy →</a></p>
+                      </div>
+                    </div>
+                  </details>
+                </div>
                 <div className="flex items-center gap-3">
                   <div className="relative flex-1">
                     <input
