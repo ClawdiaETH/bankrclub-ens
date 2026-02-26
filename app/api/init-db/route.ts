@@ -25,5 +25,9 @@ export async function GET() {
   await sql`ALTER TABLE registrations ADD COLUMN IF NOT EXISTS payment_token VARCHAR(10) DEFAULT 'ETH'`;
   await sql`CREATE INDEX IF NOT EXISTS idx_subdomain ON registrations(subdomain)`;
   await sql`CREATE INDEX IF NOT EXISTS idx_address ON registrations(address)`;
+  await sql`CREATE TABLE IF NOT EXISTS siwa_nonces (
+    nonce TEXT PRIMARY KEY,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`;
   return NextResponse.json({ ok: true, message: 'DB initialized' });
 }
