@@ -82,7 +82,7 @@ export async function getRecentRegistrations(limit = 10) {
 export async function storeNonce(nonce: string): Promise<void> {
   const sql = getDb();
   await sql`INSERT INTO siwa_nonces (nonce, created_at) VALUES (${nonce}, NOW())
-    ON CONFLICT (nonce) DO NOTHING`;
+    ON CONFLICT (nonce) DO UPDATE SET created_at = NOW()`;
 }
 
 export async function consumeNonce(nonce: string): Promise<boolean> {
