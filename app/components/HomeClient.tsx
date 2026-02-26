@@ -162,8 +162,9 @@ export default function Home() {
     return availability.price;
   })();
 
-  // Validate fee recipient value for non-wallet types
+  // Fee recipient validation only matters when token launch is enabled
   const feeRecipientValid =
+    !launchToken ||
     feeRecipientType === 'wallet' ||
     (feeRecipientValue.trim().length > 0);
 
@@ -202,13 +203,19 @@ export default function Home() {
   const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
+    if (!address) {
+      setUploadError('Connect wallet first');
+      return;
+    }
     setUploadError(null);
+    setCustomLogoUrl('');
     setUploadingLogo(true);
     // Show local preview immediately
     setLogoPreview(URL.createObjectURL(file));
     try {
       const form = new FormData();
       form.append('file', file);
+      form.append('address', address);
       const res = await fetch(`${API_BASE}/api/upload`, { method: 'POST', body: form });
       const data = await res.json();
       if (!res.ok) {
@@ -676,7 +683,7 @@ export default function Home() {
               {/* ── Claim button ── */}
               <button
                 onClick={handleClaim}
-                disabled={!availability?.available || claiming || !name || !feeRecipientValid || uploadingLogo || (logoMode === 'custom' && !customLogoUrl)}
+                disabled={!availability?.available || claiming || !name || !feeRecipientValid || uploadingLogo || (launchToken && logoMode === 'custom' && !customLogoUrl)}
                 className="w-full bg-gradient-to-r from-purple-600 to-orange-600 hover:from-purple-500 hover:to-orange-500 text-white font-bold py-4 px-8 rounded-xl transition-all duration-200 transform hover:scale-[1.02] shadow-xl disabled:opacity-50 disabled:cursor-not-allowed disabled:hover:scale-100"
               >
                 {claiming ? (

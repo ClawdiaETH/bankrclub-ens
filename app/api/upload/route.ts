@@ -4,6 +4,7 @@
  * Used for custom token logos before submitting to the Bankr deploy API.
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { verifyBankrClubHolder } from '@/lib/nftVerify';
 
 export const dynamic = 'force-dynamic';
 
@@ -31,6 +32,17 @@ export async function POST(req: NextRequest) {
     formData = await req.formData();
   } catch {
     return NextResponse.json({ error: 'invalid multipart form data' }, { status: 400, headers: corsHeaders });
+  }
+
+  const addressField = formData.get('address');
+  const address = typeof addressField === 'string' ? addressField.trim() : '';
+  if (!address) {
+    return NextResponse.json({ error: 'address field required' }, { status: 400, headers: corsHeaders });
+  }
+
+  const { isHolder } = await verifyBankrClubHolder(address);
+  if (!isHolder) {
+    return NextResponse.json({ error: 'BankrClub NFT required' }, { status: 403, headers: corsHeaders });
   }
 
   const file = formData.get('file');

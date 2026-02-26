@@ -168,11 +168,14 @@ export async function POST(req: NextRequest) {
   // Optional: launch token on Bankr
   let tokenInfo = null;
   if (launchTokenOnBankr) {
+    const normalizedFeeRecipientValue =
+      typeof feeRecipientValue === 'string' ? feeRecipientValue.trim() : '';
+
     // Build fee recipient — non-wallet types use the user-supplied value
     const feeRecipient: FeeRecipient =
       recipientType === 'wallet'
         ? { type: 'wallet', value: address }
-        : { type: recipientType, value: feeRecipientValue ?? address };
+        : { type: recipientType, value: normalizedFeeRecipientValue || address };
 
     // Determine token logo: prefer user-uploaded URL, fall back to NFT art
     let tokenImage: string | undefined;
