@@ -14,15 +14,14 @@ import { verifyBankrClubHolder } from '@/lib/nftVerify';
 import { launchToken, FeeRecipient, FeeRecipientType } from '@/lib/bankrApi';
 import { getNftImage } from '@/lib/nftMeta';
 import { announceRegistration } from '@/lib/neynar';
+import {
+  LAUNCH_ERROR_MESSAGES,
+  getPremiumPrice,
+  isPremiumName,
+  validateName,
+} from '@/lib/registration';
 
 export const dynamic = 'force-dynamic';
-
-const LAUNCH_ERROR_MESSAGES: Record<string, string> = {
-  rate_limited: 'Token launch limit reached for today — try again tomorrow',
-  api_error: 'Bankr API error — your name is registered, token launch failed',
-  timeout: 'Bankr API timed out — your name is registered, token launch failed',
-  unknown: 'Token launch failed — your name is registered',
-};
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -34,35 +33,9 @@ export async function OPTIONS() {
   return new NextResponse(null, { status: 200, headers: corsHeaders });
 }
 
-const RESERVED = [
-  'bankr', 'admin', 'www', 'api', 'app', 'mail',
-  'help', 'support', 'team', 'clawdia',
-];
-
 const VALID_FEE_RECIPIENT_TYPES: FeeRecipientType[] = ['wallet', 'x', 'farcaster', 'ens'];
 const PINATA_GATEWAY_HOST = 'gateway.pinata.cloud';
 const PINATA_GATEWAY_PATH_PREFIX = '/ipfs/';
-
-function validateName(name: string): { valid: boolean; reason?: string } {
-  if (!name || name.length < 3) return { valid: false, reason: 'minimum 3 characters' };
-  if (name.length > 32) return { valid: false, reason: 'maximum 32 characters' };
-  if (!/^[a-z0-9-]+$/.test(name))
-    return { valid: false, reason: 'lowercase letters, numbers, hyphens only' };
-  if (name.startsWith('-') || name.endsWith('-'))
-    return { valid: false, reason: 'cannot start or end with hyphen' };
-  if (RESERVED.includes(name)) return { valid: false, reason: 'reserved name' };
-  return { valid: true };
-}
-
-function getPremiumPrice(name: string): number {
-  const len = name.length;
-  if (len === 3) return 0.05;
-  if (len === 4) return 0.02;
-  if (len === 5) return 0.01;
-  if (len === 6) return 0.005;
-  if (len === 7) return 0.003;
-  return 0.002; // 8 chars
-}
 
 export async function POST(req: NextRequest) {
   // --- SIWA Receipt Auth ---
@@ -194,7 +167,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Block premium names (same as /api/claim)
-  const isPremium = name.length <= 8;
+  const isPremium = isPremiumName(name);
   const basePrice = isPremium ? getPremiumPrice(name) : 0;
   if (isPremium) {
     console.log(`Agent premium claim: ${name} | base=${basePrice} ETH`);

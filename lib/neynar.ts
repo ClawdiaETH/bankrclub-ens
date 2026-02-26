@@ -12,8 +12,7 @@ export async function announceRegistration(
   if (!apiKey || !signerUuid) return;
 
   const emoji = isAgent ? '🤖' : '🐚';
-  const memberNumber = Math.floor(Math.random() * 1000) + 1;
-  const text = `${emoji} ${subdomain}.bankrclub.eth just claimed their ENS subdomain on bankrclub.eth.limo — BankrClub member #${memberNumber}`;
+  const text = `${emoji} ${subdomain}.bankrclub.eth just claimed their ENS subdomain on bankrclub.eth.limo`;
 
   await fetch('https://api.neynar.com/v2/farcaster/cast', {
     method: 'POST',
