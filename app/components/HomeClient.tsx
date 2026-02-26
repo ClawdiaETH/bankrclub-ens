@@ -464,23 +464,44 @@ export default function Home() {
                     )}
                   </div>
                 )}
-                <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 text-left space-y-2">
-                  <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide">What&apos;s next</p>
-                  <div className="space-y-1 text-sm text-gray-300">
-                    <p>🔗 Share <span className="font-mono text-blue-400">{claimResult.ens}</span> as your web3 identity</p>
-                    <p>💳 Use it in any ENS-compatible wallet or dApp</p>
+                <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 text-left space-y-3">
+                  <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide">How to use your ENS</p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-start gap-2">
+                      <span>🔍</span>
+                      <span className="text-gray-300">
+                        Look it up on{' '}
+                        <a href={`https://app.ens.domains/${claimResult.ens}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">app.ens.domains</a>
+                        {' '}— resolves via CCIP-Read
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span>💳</span>
+                      <span className="text-gray-300">Use <span className="font-mono text-blue-400">{claimResult.ens}</span> as your username in Rainbow, MetaMask, or any ENS-aware app — send ETH to it like an address</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span>🌐</span>
+                      <span className="text-gray-300">
+                        Your profile page:{' '}
+                        <a href={`https://${claimResult.ens}.limo`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline font-mono">{claimResult.ens}.limo</a>
+                      </span>
+                    </div>
                     {claimResult.tokenInfo && !claimResult.tokenInfo.error && (
-                      <p>📈 Watch your token trade on{' '}
-                        <a
-                          href={claimResult.tokenInfo.tokenAddress
-                            ? `https://bankr.bot/launches/${claimResult.tokenInfo.tokenAddress}`
-                            : 'https://bankr.bot'}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          className="text-orange-400 hover:text-orange-300"
-                        >Bankr</a>
-                        {' '}and earn fees automatically
-                      </p>
+                      <div className="flex items-start gap-2">
+                        <span>📈</span>
+                        <span className="text-gray-300">
+                          Track{' '}
+                          <a
+                            href={claimResult.tokenInfo.tokenAddress
+                              ? `https://bankr.bot/launches/${claimResult.tokenInfo.tokenAddress}`
+                              : 'https://bankr.bot'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-orange-400 hover:text-orange-300"
+                          >your token on Bankr</a>
+                          {' '}— fees land in your wallet automatically
+                        </span>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -928,7 +949,7 @@ export default function Home() {
             ⚡ Zero gas fees • 🚀 Instant registration • ✅ Verified ownership
           </p>
           <p className="text-gray-500 text-xs font-mono">
-            Powered by CCIP-Read (EIP-3668) • Live on Ethereum
+            Powered by CCIP-Read (EIP-3668) • Live on Base
           </p>
         </div>
       </div>
