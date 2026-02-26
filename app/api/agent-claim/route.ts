@@ -7,15 +7,13 @@ import { verifyReceipt } from '@buildersgarden/siwa/receipt';
 import {
   checkAvailability,
   createRegistration,
-  updateTokenInfo,
   getRegistrationByAddress,
 } from '@/lib/db';
 import { verifyBankrClubHolder } from '@/lib/nftVerify';
-import { launchToken, FeeRecipient, FeeRecipientType } from '@/lib/bankrApi';
-import { getNftImage } from '@/lib/nftMeta';
+import { FeeRecipientType } from '@/lib/bankrApi';
 import { announceRegistration } from '@/lib/neynar';
+import { launchClaimToken } from '@/lib/tokenLaunch';
 import {
-  LAUNCH_ERROR_MESSAGES,
   getPremiumPrice,
   isPremiumName,
   validateName,
@@ -34,8 +32,6 @@ export async function OPTIONS() {
 }
 
 const VALID_FEE_RECIPIENT_TYPES: FeeRecipientType[] = ['wallet', 'x', 'farcaster', 'ens'];
-const PINATA_GATEWAY_HOST = 'gateway.pinata.cloud';
-const PINATA_GATEWAY_PATH_PREFIX = '/ipfs/';
 
 export async function POST(req: NextRequest) {
   // --- SIWA Receipt Auth ---
@@ -201,59 +197,15 @@ export async function POST(req: NextRequest) {
   // Optional: launch token on Bankr
   let tokenInfo = null;
   if (launchTokenOnBankr) {
-    const feeRecipient: FeeRecipient =
-      recipientType === 'wallet'
-        ? { type: 'wallet', value: address }
-        : { type: recipientType, value: normalizedFeeRecipientValue };
-
-    let tokenImage: string | undefined;
-    if (logoUrl && typeof logoUrl === 'string') {
-      try {
-        const u = new URL(logoUrl);
-        const isPinnedPinataUrl =
-          u.protocol === 'https:' &&
-          u.hostname === PINATA_GATEWAY_HOST &&
-          u.pathname.startsWith(PINATA_GATEWAY_PATH_PREFIX);
-        if (isPinnedPinataUrl) tokenImage = logoUrl;
-      } catch {
-        /* ignore invalid */
-      }
-    }
-    if (!tokenImage) {
-      tokenImage = await getNftImage(tokenId);
-    }
-
-    const { data: bankrResult, error: launchError } = await launchToken(name, address, {
-      feeRecipient,
+    tokenInfo = await launchClaimToken({
+      name,
+      address,
+      tokenId,
+      recipientType,
+      feeRecipientValue: normalizedFeeRecipientValue,
       tweetUrl: validatedTweetUrl,
-      image: tokenImage,
+      logoUrl,
     });
-
-    if (launchError) {
-      tokenInfo = {
-        error: LAUNCH_ERROR_MESSAGES[launchError] ?? LAUNCH_ERROR_MESSAGES.unknown,
-      };
-    } else if (bankrResult?.success) {
-      tokenInfo = {
-        tokenAddress: bankrResult.tokenAddress,
-        tokenSymbol: name.toUpperCase().slice(0, 10),
-        poolId: bankrResult.poolId,
-        txHash: bankrResult.txHash,
-        simulated: bankrResult.simulated,
-        feeDistribution: bankrResult.feeDistribution,
-        feeRecipient,
-      };
-      try {
-        await updateTokenInfo(name, {
-          bankrTokenAddress: bankrResult.tokenAddress,
-          bankrTokenSymbol: name.toUpperCase().slice(0, 10),
-          bankrPoolId: bankrResult.poolId,
-          bankrTxHash: bankrResult.txHash || '',
-        });
-      } catch (e) {
-        console.error('Failed to store token info:', e);
-      }
-    }
   }
 
   return NextResponse.json(

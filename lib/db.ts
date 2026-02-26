@@ -81,6 +81,7 @@ export async function getRecentRegistrations(limit = 10) {
 // SIWA nonce store (5-min TTL, serverless-safe via Postgres)
 export async function storeNonce(nonce: string): Promise<void> {
   const sql = getDb();
+  await sql`DELETE FROM siwa_nonces WHERE created_at <= NOW() - INTERVAL '5 minutes'`;
   await sql`INSERT INTO siwa_nonces (nonce, created_at) VALUES (${nonce}, NOW())
     ON CONFLICT (nonce) DO UPDATE SET created_at = NOW()`;
 }
