@@ -648,7 +648,10 @@ export default function Home() {
                   <div>
                     <p className="text-white font-semibold">🚀 Launch my token on Bankr</p>
                     <p className="text-gray-400 text-sm mt-1">
-                      57% of trading fees go directly to you. Token named after your ENS.
+                      {name
+                        ? <>57% of trading fees go to you. Deploys as <span className="text-white font-semibold font-mono">${name.toUpperCase().slice(0, 10)}</span> on Base.</>
+                        : '57% of trading fees go directly to you. Enter your name to see your token symbol.'
+                      }
                     </p>
                   </div>
                   <div className={`w-12 h-6 rounded-full transition-colors flex items-center shrink-0 ml-4 ${
