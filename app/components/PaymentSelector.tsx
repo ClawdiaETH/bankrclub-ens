@@ -8,6 +8,8 @@ interface PaymentSelectorProps {
   hasClawdia: boolean;
   selected: PaymentToken;
   onChange: (token: PaymentToken) => void;
+  tokenAmount?: number | null;      // live token amount from price oracle
+  tokenPriceFetching?: boolean;
 }
 
 export default function PaymentSelector({
@@ -16,6 +18,8 @@ export default function PaymentSelector({
   hasClawdia,
   selected,
   onChange,
+  tokenAmount,
+  tokenPriceFetching,
 }: PaymentSelectorProps) {
   const bnkrPrice = parseFloat((basePrice * 0.9).toFixed(4));
   const clawdiaPrice = parseFloat((basePrice * 0.75).toFixed(4));
@@ -66,7 +70,13 @@ export default function PaymentSelector({
           {hasBnkr ? (
             <div>
               <span className="line-through text-gray-500 font-mono text-sm mr-2">{basePrice} ETH</span>
-              <span className="text-orange-400 font-mono font-bold text-lg">{bnkrPrice} ETH</span>
+              {selected === 'BNKR' && tokenAmount != null ? (
+                <span className="text-orange-400 font-mono font-bold text-lg">
+                  {tokenPriceFetching ? '…' : `${tokenAmount.toFixed(2)} $BNKR`}
+                </span>
+              ) : (
+                <span className="text-orange-400 font-mono font-bold text-lg">{bnkrPrice} ETH equiv</span>
+              )}
             </div>
           ) : (
             <a
@@ -108,7 +118,13 @@ export default function PaymentSelector({
           {hasClawdia ? (
             <div>
               <span className="line-through text-gray-500 font-mono text-sm mr-2">{basePrice} ETH</span>
-              <span className="text-purple-400 font-mono font-bold text-lg">{clawdiaPrice} ETH</span>
+              {selected === 'CLAWDIA' && tokenAmount != null ? (
+                <span className="text-purple-400 font-mono font-bold text-lg">
+                  {tokenPriceFetching ? '…' : `${tokenAmount.toFixed(2)} $CLAWDIA`}
+                </span>
+              ) : (
+                <span className="text-purple-400 font-mono font-bold text-lg">{clawdiaPrice} ETH equiv</span>
+              )}
             </div>
           ) : (
             <a

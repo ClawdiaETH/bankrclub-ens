@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, useReadContract, useSendTransaction } from 'wagmi';
+import { useAccount, useReadContract, useSendTransaction, useWriteContract } from 'wagmi';
 import { parseEther } from 'viem';
+import { getTokenPriceInEth, calcTokenAmount, toTokenWei, BNKR_ADDRESS, CLAWDIA_ADDRESS } from '@/lib/tokenPrice';
 import TypewriterSubdomain from './TypewriterSubdomain';
 import PaymentSelector, { PaymentToken } from './PaymentSelector';
 import { getDiscountTokenBalances, TokenBalances } from '@/lib/tokenBalances';
@@ -74,6 +75,9 @@ function bpsToPercent(bps: number) {
 export default function Home() {
   const { address, isConnected } = useAccount();
   const { sendTransactionAsync } = useSendTransaction();
+  const { writeContractAsync } = useWriteContract();
+  const [tokenAmount, setTokenAmount] = useState<number | null>(null);
+  const [tokenPriceFetching, setTokenPriceFetching] = useState(false);
 
   const { data: nftBalance } = useReadContract({
     address: BANKRCLUB_NFT,
@@ -113,6 +117,20 @@ export default function Home() {
   const [showAdvanced, setShowAdvanced] = useState(false);
   const [showPricing, setShowPricing] = useState(false);
   const pricingRef = useRef<HTMLDivElement>(null);
+
+  // Fetch token price when BNKR/CLAWDIA selected and name has a premium price
+  useEffect(() => {
+    if (paymentToken === 'ETH' || !displayPrice) {
+      setTokenAmount(null);
+      return;
+    }
+    const tokenAddress = paymentToken === 'BNKR' ? BNKR_ADDRESS : CLAWDIA_ADDRESS;
+    setTokenPriceFetching(true);
+    getTokenPriceInEth(tokenAddress)
+      .then(price => setTokenAmount(calcTokenAmount(displayPrice, price)))
+      .catch(() => setTokenAmount(null))
+      .finally(() => setTokenPriceFetching(false));
+  }, [paymentToken, displayPrice]);
 
   useEffect(() => {
     if (!showPricing) return;
@@ -205,26 +223,45 @@ export default function Home() {
     let paymentTxHash: string | undefined;
 
     try {
-      // Step 1: Send ETH payment for premium names
+      // Step 1: Send payment for premium names (ETH or ERC20 token)
       if (availability.isPremium && displayPrice) {
         const TREASURY = '0xf17b5dD382B048Ff4c05c1C9e4E24cfC5C6adAd9';
-        const discountNote = paymentToken !== 'ETH' ? ` (${paymentToken} holder rate)` : '';
-        setClaimStatus(`Sending ${displayPrice} ETH${discountNote}…`);
+        const ERC20_ABI = [{
+          name: 'transfer', type: 'function' as const,
+          inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }],
+          outputs: [{ name: '', type: 'bool' }], stateMutability: 'nonpayable' as const,
+        }] as const;
+
         try {
-          const hash = await sendTransactionAsync({
-            to: TREASURY as `0x${string}`,
-            value: parseEther(String(displayPrice)),
-            chainId: 8453,
-          });
-          paymentTxHash = hash;
+          if (paymentToken === 'ETH') {
+            setClaimStatus(`Sending ${displayPrice} ETH…`);
+            paymentTxHash = await sendTransactionAsync({
+              to: TREASURY as `0x${string}`,
+              value: parseEther(String(displayPrice)),
+              chainId: 8453,
+            });
+          } else {
+            const tokenAddress = (paymentToken === 'BNKR' ? BNKR_ADDRESS : CLAWDIA_ADDRESS) as `0x${string}`;
+            setClaimStatus(`Getting $${paymentToken} price…`);
+            const tokenPriceInEth = await getTokenPriceInEth(tokenAddress);
+            const amount = toTokenWei(calcTokenAmount(displayPrice, tokenPriceInEth));
+            const displayAmt = (Number(amount) / 1e18).toFixed(2);
+            setClaimStatus(`Sending ${displayAmt} $${paymentToken}…`);
+            paymentTxHash = await writeContractAsync({
+              address: tokenAddress,
+              abi: ERC20_ABI,
+              functionName: 'transfer',
+              args: [TREASURY as `0x${string}`, amount],
+              chainId: 8453,
+            });
+          }
         } catch (e: unknown) {
           const msg = e instanceof Error ? e.message : String(e);
           setClaimError(msg.includes('rejected') || msg.includes('denied') ? 'Payment cancelled.' : `Payment failed: ${msg}`);
           return;
         }
 
-        // Wait for confirmation on Base (~2s blocks)
-        setClaimStatus('Confirming payment on Base…');
+        setClaimStatus('Confirming on Base…');
         for (let attempt = 0; attempt < 30; attempt++) {
           await new Promise(r => setTimeout(r, 2000));
           const rpc = await fetch('https://mainnet.base.org', {
@@ -701,6 +738,8 @@ export default function Home() {
                   hasClawdia={tokenBalances?.hasClawdia ?? false}
                   selected={paymentToken}
                   onChange={setPaymentToken}
+                  tokenAmount={tokenAmount}
+                  tokenPriceFetching={tokenPriceFetching}
                 />
               )}
 
@@ -902,7 +941,14 @@ export default function Home() {
 
               <p className="text-gray-500 text-xs text-center">
                 One name per wallet. Permanent registration
-                {availability?.isPremium ? ` — ${displayPrice} ETH payment on Base.` : ' — no gas fees.'}
+                {availability?.isPremium
+                  ? paymentToken === 'ETH'
+                    ? ` — ${displayPrice} ETH payment on Base.`
+                    : tokenAmount != null
+                      ? ` — ~${tokenAmount.toFixed(2)} $${paymentToken} payment on Base.`
+                      : ` — ${displayPrice} ETH equiv in $${paymentToken} on Base.`
+                  : ' — no gas fees.'
+                }
               </p>
             </div>
           )}
