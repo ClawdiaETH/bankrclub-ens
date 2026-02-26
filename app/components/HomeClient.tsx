@@ -269,7 +269,10 @@ export default function Home() {
           </div>
           <TypewriterSubdomain />
           <p className="text-xl sm:text-2xl text-gray-300 max-w-2xl mx-auto">
-            Exclusive ENS subdomains for BankrClub NFT holders
+            Your name. Your token. Your fees — forever.
+          </p>
+          <p className="text-base text-gray-500 max-w-xl mx-auto">
+            BankrClub members get a free ENS subdomain + earn 57% of every trade on their personal token.
           </p>
         </div>
 
@@ -296,7 +299,7 @@ export default function Home() {
                 <span className="font-mono text-blue-400 font-semibold">
                   yourname.bankrclub.eth
                 </span>{' '}
-                — a permanent, decentralized identity on Ethereum.
+                — your permanent web3 identity, free for BankrClub members.
               </p>
             </div>
           </div>
@@ -328,11 +331,6 @@ export default function Home() {
                     <p className="text-orange-400 font-semibold text-center">
                       🚀 Token launched on Bankr!
                     </p>
-                    {claimResult.tokenInfo.simulated && (
-                      <p className="text-yellow-400 text-sm text-center">
-                        ⚠️ Simulated — token not live yet (partner key pending)
-                      </p>
-                    )}
                     {claimResult.tokenInfo.tokenAddress && (
                       <div>
                         <p className="text-gray-400 text-xs">Token address</p>
@@ -391,6 +389,19 @@ export default function Home() {
                     )}
                   </div>
                 )}
+                <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 text-left space-y-2">
+                  <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide">What&apos;s next</p>
+                  <div className="space-y-1 text-sm text-gray-300">
+                    <p>🔗 Share <span className="font-mono text-blue-400">{claimResult.ens}</span> as your web3 identity</p>
+                    <p>💳 Use it in any ENS-compatible wallet or dApp</p>
+                    {claimResult.tokenInfo && !claimResult.tokenInfo.error && (
+                      <p>📈 Watch your token trade on{' '}
+                        <a href={`https://bankr.bot`} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300">Bankr</a>
+                        {' '}and earn fees automatically
+                      </p>
+                    )}
+                  </div>
+                </div>
                 <a
                   href={`https://${claimResult.ens}.limo`}
                   target="_blank"
@@ -410,7 +421,7 @@ export default function Home() {
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
                   <div className="text-3xl mb-3">🆓</div>
                   <h3 className="text-lg font-bold text-white mb-2">Free Names</h3>
-                  <p className="text-gray-400 text-sm">9+ characters, yours forever</p>
+                  <p className="text-gray-400 text-sm">9+ characters — permanent, no gas</p>
                 </div>
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
                   <div className="text-3xl mb-3">⭐</div>
@@ -423,11 +434,24 @@ export default function Home() {
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
                   <div className="text-3xl mb-3">🪙</div>
                   <h3 className="text-lg font-bold text-white mb-2">Launch Your Token</h3>
-                  <p className="text-gray-400 text-sm">57% of trading fees go to you</p>
+                  <p className="text-gray-400 text-sm">57% of every trade's fees — yours automatically, forever</p>
                 </div>
               </div>
-              <div className="p-8 pt-0 flex justify-center">
-                <ConnectButton label="Connect Wallet to Claim" />
+              <div className="p-8 pt-0 space-y-4">
+                <div className="flex justify-center">
+                  <ConnectButton label="Connect Wallet to Claim" />
+                </div>
+                <p className="text-center text-gray-600 text-xs">
+                  🤖 AI agent?{' '}
+                  <a
+                    href="https://github.com/ClawdiaETH/bankrclub-ens#agent-api"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-500 hover:text-gray-300 underline transition-colors"
+                  >
+                    Register via REST API →
+                  </a>
+                </p>
               </div>
             </>
           )}
@@ -719,7 +743,7 @@ export default function Home() {
               </button>
 
               <p className="text-gray-500 text-xs text-center">
-                One name per wallet. Registration is permanent and offchain (gas-free).
+                One name per wallet. Permanent registration — no gas fees.
               </p>
             </div>
           )}
@@ -767,7 +791,7 @@ export default function Home() {
             ⚡ Zero gas fees • 🚀 Instant registration • ✅ Verified ownership
           </p>
           <p className="text-gray-500 text-xs font-mono">
-            Powered by CCIP-Read (EIP-3668) • Launching Feb 24th, 2026
+            Powered by CCIP-Read (EIP-3668) • Live on Ethereum
           </p>
         </div>
       </div>
