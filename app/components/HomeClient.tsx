@@ -289,7 +289,7 @@ export default function Home() {
                 />
                 <div className="text-center md:text-left">
                   <h2 className="text-3xl font-bold text-white mb-2">
-                    For BankrClub NFT Holders
+                    For BankrClub NFT holders
                   </h2>
                   <p className="text-orange-400 font-semibold">1,000 founding members only</p>
                 </div>
@@ -420,12 +420,12 @@ export default function Home() {
               <div className="grid md:grid-cols-3 gap-6 p-8">
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
                   <div className="text-3xl mb-3">🆓</div>
-                  <h3 className="text-lg font-bold text-white mb-2">Free Names</h3>
+                  <h3 className="text-lg font-bold text-white mb-2">Free names</h3>
                   <p className="text-gray-400 text-sm">9+ characters — permanent, no gas</p>
                 </div>
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
                   <div className="text-3xl mb-3">⭐</div>
-                  <h3 className="text-lg font-bold text-white mb-2">Premium Names</h3>
+                  <h3 className="text-lg font-bold text-white mb-2">Premium names</h3>
                   <p className="text-gray-400 text-sm">
                     3–8 chars from 0.002 ETH<br />
                     <span className="text-orange-400">10% off with $BNKR · 25% off with $CLAWDIA</span>
@@ -433,13 +433,13 @@ export default function Home() {
                 </div>
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
                   <div className="text-3xl mb-3">🪙</div>
-                  <h3 className="text-lg font-bold text-white mb-2">Launch Your Token</h3>
+                  <h3 className="text-lg font-bold text-white mb-2">Launch your token</h3>
                   <p className="text-gray-400 text-sm">57% of every trade's fees — yours automatically, forever</p>
                 </div>
               </div>
               <div className="p-8 pt-0 space-y-4">
                 <div className="flex justify-center">
-                  <ConnectButton label="Connect Wallet to Claim" />
+                  <ConnectButton label="Connect wallet to claim" />
                 </div>
                 <p className="text-center text-gray-600 text-xs">
                   🤖 AI agent?{' '}
@@ -460,7 +460,7 @@ export default function Home() {
           {isConnected && !isHolder && !claimResult && (
             <div className="p-8 text-center space-y-6">
               <div className="text-5xl">🔒</div>
-              <h3 className="text-2xl font-bold text-white">BankrClub NFT Required</h3>
+              <h3 className="text-2xl font-bold text-white">BankrClub NFT required</h3>
               <p className="text-gray-400 max-w-md mx-auto">
                 You need to hold a BankrClub NFT to claim a{' '}
                 <span className="font-mono text-blue-400">yourname.bankrclub.eth</span> subdomain.
@@ -488,7 +488,7 @@ export default function Home() {
           {isConnected && isHolder && !claimResult && (
             <div className="p-8 space-y-6">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xl font-bold text-white">Claim Your Subdomain</h3>
+                <h3 className="text-xl font-bold text-white">Claim your subdomain</h3>
                 <ConnectButton />
               </div>
               <div className="bg-green-900/30 border border-green-700 rounded-xl p-4 text-sm text-green-400">

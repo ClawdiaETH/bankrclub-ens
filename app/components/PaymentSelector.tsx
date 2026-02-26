@@ -99,7 +99,7 @@ export default function PaymentSelector({
           {/* Best deal pill */}
           <div className="absolute -top-2 right-3">
             <span className="bg-gradient-to-r from-purple-600 to-pink-600 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow">
-              ★ Best Deal
+              ★ Best deal
             </span>
           </div>
           <div className="flex items-center gap-2 mb-2 flex-wrap">
