@@ -118,19 +118,6 @@ export default function Home() {
   const [showPricing, setShowPricing] = useState(false);
   const pricingRef = useRef<HTMLDivElement>(null);
 
-  // Fetch token price when BNKR/CLAWDIA selected and name has a premium price
-  useEffect(() => {
-    if (paymentToken === 'ETH' || !displayPrice) {
-      setTokenAmount(null);
-      return;
-    }
-    const tokenAddress = paymentToken === 'BNKR' ? BNKR_ADDRESS : CLAWDIA_ADDRESS;
-    setTokenPriceFetching(true);
-    getTokenPriceInEth(tokenAddress)
-      .then(price => setTokenAmount(calcTokenAmount(displayPrice, price)))
-      .catch(() => setTokenAmount(null))
-      .finally(() => setTokenPriceFetching(false));
-  }, [paymentToken, displayPrice]);
 
   useEffect(() => {
     if (!showPricing) return;
@@ -205,6 +192,21 @@ export default function Home() {
     }
     return availability.price;
   })();
+
+  // Fetch token price when BNKR/CLAWDIA selected and name has a premium price
+  useEffect(() => {
+    if (paymentToken === 'ETH' || !displayPrice) {
+      setTokenAmount(null);
+      return;
+    }
+    const tokenAddress = paymentToken === 'BNKR' ? BNKR_ADDRESS : CLAWDIA_ADDRESS;
+    setTokenPriceFetching(true);
+    getTokenPriceInEth(tokenAddress)
+      .then(price => setTokenAmount(calcTokenAmount(displayPrice, price)))
+      .catch(() => setTokenAmount(null))
+      .finally(() => setTokenPriceFetching(false));
+  }, [paymentToken, displayPrice]);
+
 
   // Fee recipient validation only matters when token launch is enabled
   const feeRecipientValid =
