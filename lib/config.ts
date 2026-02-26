@@ -11,9 +11,8 @@ export const CONTRACTS = {
   },
 
   // Discount tokens
-  // TODO: confirm $BNKR address once official contract is deployed on Base
   BNKR: {
-    address: '0x0000000000000000000000000000000000000001' as `0x${string}`, // TODO: confirm $BNKR address
+    address: '0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b' as `0x${string}`,
     symbol: 'BNKR',
     chain: 'base',
     discount: 0.10, // 10% off premium names

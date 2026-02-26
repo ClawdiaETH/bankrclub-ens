@@ -1,16 +1,24 @@
 const BANKR_API_URL = 'https://api.bankr.bot/token-launches/deploy';
 
+export type FeeRecipientType = 'wallet' | 'x' | 'farcaster' | 'ens';
+
+export interface FeeRecipient {
+  type: FeeRecipientType;
+  value: string;
+}
+
 interface BankrDeployRequest {
   tokenName: string;
   tokenSymbol: string;
   description?: string;
   image?: string;
+  tweetUrl?: string;
   websiteUrl?: string;
-  feeRecipient: { type: 'wallet'; value: string };
+  feeRecipient: FeeRecipient;
   simulateOnly?: boolean;
 }
 
-interface BankrDeployResponse {
+export interface BankrDeployResponse {
   success: boolean;
   tokenAddress: string;
   poolId: string;
@@ -27,21 +35,39 @@ interface BankrDeployResponse {
   };
 }
 
+export interface TokenLaunchOptions {
+  /** Where trading fees go — defaults to { type: 'wallet', value: holderAddress } */
+  feeRecipient?: FeeRecipient;
+  /** URL to an existing tweet about the token */
+  tweetUrl?: string;
+  /** URL to token logo image (uploaded to IPFS by Bankr) */
+  image?: string;
+}
+
 export async function launchToken(
   subdomain: string,
-  holderAddress: string
+  holderAddress: string,
+  options?: TokenLaunchOptions
 ): Promise<BankrDeployResponse | null> {
   const partnerKey = process.env.BANKR_PARTNER_KEY;
   const simulateOnly = !partnerKey || partnerKey === 'pending';
+
+  const feeRecipient: FeeRecipient = options?.feeRecipient ?? {
+    type: 'wallet',
+    value: holderAddress,
+  };
 
   const payload: BankrDeployRequest = {
     tokenName: subdomain.charAt(0).toUpperCase() + subdomain.slice(1),
     tokenSymbol: subdomain.toUpperCase().slice(0, 10),
     description: `Personal token for ${subdomain}.bankrclub.eth — BankrClub member`,
     websiteUrl: `https://${subdomain}.bankrclub.eth.limo`,
-    feeRecipient: { type: 'wallet', value: holderAddress },
+    feeRecipient,
     simulateOnly,
   };
+
+  if (options?.tweetUrl) payload.tweetUrl = options.tweetUrl;
+  if (options?.image) payload.image = options.image;
 
   const headers: Record<string, string> = { 'Content-Type': 'application/json' };
   if (partnerKey && partnerKey !== 'pending') {

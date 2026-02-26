@@ -22,11 +22,13 @@ NEXT_PUBLIC_IPFS_BUILD=true \
   npm run build
 
 echo "📦 Uploading to Pinata..."
+# wrapWithDirectory:false = CID points directly to the app files (no extra subfolder level)
+# cidVersion:0 = CIDv0 (Qm...) for simpler ENS contenthash encoding
 RESPONSE=$(curl -s -X POST "https://api.pinata.cloud/pinning/pinFileToIPFS" \
   -H "Authorization: Bearer $PINATA_JWT" \
-  -F "file=@out" \
+  -F "file=@out;filename=out" \
   --form-string 'pinataMetadata={"name":"bankrclub-ens"}' \
-  --form-string 'pinataOptions={"cidVersion":1}')
+  --form-string 'pinataOptions={"cidVersion":0,"wrapWithDirectory":false}')
 
 CID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['IpfsHash'])")
 if [ -z "$CID" ]; then
@@ -37,16 +39,31 @@ fi
 echo "✅ CID: $CID"
 echo "🔗 Updating bankrclub.eth contenthash..."
 
-# Encode as IPFS contenthash: e3010170 prefix + UTF-8 CID bytes
-# Note: for production use https://content-hash.now.sh to verify the encoding
-CONTENTHASH=$(python3 -c "cid='$CID'; print('0xe3010170' + cid.encode().hex())")
+# Encode CIDv0 (Qm...) as ENS contenthash:
+# 0xe3 0x01 = ipfs-ns varint codec, then CIDv1 header 0x01 0x70 (version + dag-pb), then multihash bytes
+CONTENTHASH=$(python3 -c "
+ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
+def b58decode(s):
+    n = 0
+    for c in s:
+        n = n * 58 + ALPHABET.index(c)
+    result = []
+    while n > 0:
+        result.append(n % 256)
+        n //= 256
+    result.extend([0] * (len(s) - len(s.lstrip('1'))))
+    return bytes(reversed(result))
+cid = '$CID'
+cid_bytes = b58decode(cid)
+print('0xe3010170' + cid_bytes.hex())
+")
 
-cast send 0x4976fb03C32e5B8cfe2b6cCB31c09Ba78EBaBa41 \
+cast send 0x31D23782992093B92Fa13d9cD56b3C02EBC61927 \
   "setContenthash(bytes32,bytes)" \
   "$(cast namehash bankrclub.eth)" \
   "$CONTENTHASH" \
   --private-key "$SIGNING_KEY" \
-  --rpc-url https://eth.llamarpc.com
+  --rpc-url https://ethereum.publicnode.com
 
 echo ""
 echo "🚀 Live at https://bankrclub.eth.limo"

@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAvailability, createRegistration, updateTokenInfo, getRegistrationByAddress } from '@/lib/db';
 import { verifyBankrClubHolder } from '@/lib/nftVerify';
-import { launchToken } from '@/lib/bankrApi';
+import { launchToken, FeeRecipient, FeeRecipientType } from '@/lib/bankrApi';
+import { getNftImage } from '@/lib/nftMeta';
 
 export const dynamic = 'force-dynamic';
 
@@ -28,6 +29,10 @@ const RESERVED = [
   'help', 'support', 'team', 'clawdia',
 ];
 
+const VALID_FEE_RECIPIENT_TYPES: FeeRecipientType[] = ['wallet', 'x', 'farcaster', 'ens'];
+const PINATA_GATEWAY_HOST = 'gateway.pinata.cloud';
+const PINATA_GATEWAY_PATH_PREFIX = '/ipfs/';
+
 function validateName(name: string): { valid: boolean; reason?: string } {
   if (!name || name.length < 3) return { valid: false, reason: 'minimum 3 characters' };
   if (name.length > 32) return { valid: false, reason: 'maximum 32 characters' };
@@ -47,7 +52,19 @@ function getPremiumPrice(name: string): number {
 
 export async function POST(req: NextRequest) {
   const body = await req.json();
-  const { subdomain, address, launchTokenOnBankr, paymentToken } = body;
+  const {
+    subdomain,
+    address,
+    launchTokenOnBankr,
+    paymentToken,
+    // Fee recipient — where trading fees go (defaults to connected wallet)
+    feeRecipientType,
+    feeRecipientValue,
+    // Optional metadata for the Bankr token launch
+    tweetUrl,
+    /** Pre-uploaded IPFS URL for the token logo (user's custom image) */
+    logoUrl,
+  } = body;
 
   if (!subdomain || !address) {
     return NextResponse.json(
@@ -67,6 +84,35 @@ export async function POST(req: NextRequest) {
       { error: validation.reason },
       { status: 400, headers: corsHeaders }
     );
+  }
+
+  // Validate fee recipient type if provided
+  const recipientType: FeeRecipientType =
+    feeRecipientType && VALID_FEE_RECIPIENT_TYPES.includes(feeRecipientType)
+      ? feeRecipientType
+      : 'wallet';
+  const normalizedFeeRecipientValue =
+    typeof feeRecipientValue === 'string' ? feeRecipientValue.trim() : '';
+
+  if (launchTokenOnBankr && recipientType !== 'wallet' && !normalizedFeeRecipientValue) {
+    return NextResponse.json(
+      { error: 'fee recipient value required for selected type' },
+      { status: 400, headers: corsHeaders }
+    );
+  }
+
+  // Validate tweetUrl if provided
+  let validatedTweetUrl: string | undefined;
+  if (tweetUrl && typeof tweetUrl === 'string') {
+    try {
+      const u = new URL(tweetUrl);
+      const normalizedHostname = u.hostname.toLowerCase().replace(/^www\./, '');
+      if (normalizedHostname === 'x.com' || normalizedHostname === 'twitter.com') {
+        validatedTweetUrl = tweetUrl;
+      }
+    } catch {
+      // Invalid URL — ignore silently
+    }
   }
 
   // Verify NFT ownership
@@ -134,15 +180,44 @@ export async function POST(req: NextRequest) {
   // Optional: launch token on Bankr
   let tokenInfo = null;
   if (launchTokenOnBankr) {
-    const bankrResult = await launchToken(name, address);
+    // Build fee recipient — non-wallet types use the user-supplied value
+    const feeRecipient: FeeRecipient =
+      recipientType === 'wallet'
+        ? { type: 'wallet', value: address }
+        : { type: recipientType, value: normalizedFeeRecipientValue };
+
+    // Determine token logo: prefer user-uploaded URL, fall back to NFT art
+    let tokenImage: string | undefined;
+    if (logoUrl && typeof logoUrl === 'string') {
+      // Validate it's the Pinata gateway URL returned by /api/upload
+      try {
+        const u = new URL(logoUrl);
+        const isPinnedPinataUrl =
+          u.protocol === 'https:' &&
+          u.hostname === PINATA_GATEWAY_HOST &&
+          u.pathname.startsWith(PINATA_GATEWAY_PATH_PREFIX);
+        if (isPinnedPinataUrl) tokenImage = logoUrl;
+      } catch { /* ignore invalid */ }
+    }
+    if (!tokenImage) {
+      tokenImage = await getNftImage(tokenId);
+    }
+
+    const bankrResult = await launchToken(name, address, {
+      feeRecipient,
+      tweetUrl: validatedTweetUrl,
+      image: tokenImage,
+    });
+
     if (bankrResult?.success) {
       tokenInfo = {
         tokenAddress: bankrResult.tokenAddress,
-        tokenSymbol: bankrResult.tokenAddress ? name.toUpperCase() : null,
+        tokenSymbol: name.toUpperCase().slice(0, 10),
         poolId: bankrResult.poolId,
         txHash: bankrResult.txHash,
         simulated: bankrResult.simulated,
         feeDistribution: bankrResult.feeDistribution,
+        feeRecipient,
       };
       try {
         await updateTokenInfo(name, {
@@ -165,7 +240,6 @@ export async function POST(req: NextRequest) {
       ens: `${name}.bankrclub.eth`,
       paymentToken: token,
       tokenInfo,
-      // Suppress unused variable warning
       _registration: registration?.id,
     },
     { headers: corsHeaders }
