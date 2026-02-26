@@ -333,10 +333,15 @@ export default function Home() {
                     </p>
                     {claimResult.tokenInfo.tokenAddress && (
                       <div>
-                        <p className="text-gray-400 text-xs">Token address</p>
-                        <p className="font-mono text-white text-sm break-all">
+                        <p className="text-gray-400 text-xs mb-1">Token address</p>
+                        <a
+                          href={`https://bankr.bot/launches/${claimResult.tokenInfo.tokenAddress}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-orange-400 hover:text-orange-300 text-sm break-all underline transition-colors"
+                        >
                           {claimResult.tokenInfo.tokenAddress}
-                        </p>
+                        </a>
                       </div>
                     )}
                     {claimResult.tokenInfo.feeRecipient && claimResult.tokenInfo.feeRecipient.type !== 'wallet' && (
@@ -377,15 +382,27 @@ export default function Home() {
                         </div>
                       </div>
                     )}
-                    {claimResult.tokenInfo.poolId && !claimResult.tokenInfo.simulated && (
-                      <a
-                        href={`https://dexscreener.com/base/${claimResult.tokenInfo.poolId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block text-center bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-                      >
-                        View on Dexscreener →
-                      </a>
+                    {claimResult.tokenInfo.tokenAddress && !claimResult.tokenInfo.simulated && (
+                      <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                        <a
+                          href={`https://bankr.bot/launches/${claimResult.tokenInfo.tokenAddress}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 block text-center bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                        >
+                          View on Bankr →
+                        </a>
+                        {claimResult.tokenInfo.poolId && (
+                          <a
+                            href={`https://dexscreener.com/base/${claimResult.tokenInfo.poolId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 block text-center bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                          >
+                            Dexscreener →
+                          </a>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
@@ -396,7 +413,14 @@ export default function Home() {
                     <p>💳 Use it in any ENS-compatible wallet or dApp</p>
                     {claimResult.tokenInfo && !claimResult.tokenInfo.error && (
                       <p>📈 Watch your token trade on{' '}
-                        <a href={`https://bankr.bot`} target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300">Bankr</a>
+                        <a
+                          href={claimResult.tokenInfo.tokenAddress
+                            ? `https://bankr.bot/launches/${claimResult.tokenInfo.tokenAddress}`
+                            : 'https://bankr.bot'}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="text-orange-400 hover:text-orange-300"
+                        >Bankr</a>
                         {' '}and earn fees automatically
                       </p>
                     )}
