@@ -2,7 +2,8 @@
 
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, useReadContract } from 'wagmi';
+import { useAccount, useReadContract, useSendTransaction } from 'wagmi';
+import { parseEther } from 'viem';
 import TypewriterSubdomain from './TypewriterSubdomain';
 import PaymentSelector, { PaymentToken } from './PaymentSelector';
 import { getDiscountTokenBalances, TokenBalances } from '@/lib/tokenBalances';
@@ -72,6 +73,7 @@ function bpsToPercent(bps: number) {
 
 export default function Home() {
   const { address, isConnected } = useAccount();
+  const { sendTransactionAsync } = useSendTransaction();
 
   const { data: nftBalance } = useReadContract({
     address: BANKRCLUB_NFT,
@@ -192,11 +194,52 @@ export default function Home() {
     feeRecipientType === 'wallet' ||
     (feeRecipientValue.trim().length > 0);
 
+  const [claimStatus, setClaimStatus] = useState<string | null>(null);
+
   const handleClaim = async () => {
     if (!address || !availability?.available || !feeRecipientValid) return;
     setClaiming(true);
     setClaimError(null);
+    setClaimStatus(null);
+
+    let paymentTxHash: string | undefined;
+
     try {
+      // Step 1: Send ETH payment for premium names
+      if (availability.isPremium && displayPrice) {
+        const TREASURY = '0xf17b5dD382B048Ff4c05c1C9e4E24cfC5C6adAd9';
+        setClaimStatus(`Sending ${displayPrice} ETH payment…`);
+        try {
+          const hash = await sendTransactionAsync({
+            to: TREASURY as `0x${string}`,
+            value: parseEther(String(displayPrice)),
+            chainId: 8453,
+          });
+          paymentTxHash = hash;
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          setClaimError(msg.includes('rejected') || msg.includes('denied') ? 'Payment cancelled.' : `Payment failed: ${msg}`);
+          return;
+        }
+
+        // Wait for confirmation on Base (~2s blocks)
+        setClaimStatus('Confirming payment on Base…');
+        for (let attempt = 0; attempt < 30; attempt++) {
+          await new Promise(r => setTimeout(r, 2000));
+          const rpc = await fetch('https://mainnet.base.org', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [paymentTxHash] }),
+          });
+          const { result } = await rpc.json() as { result: { status: string } | null };
+          if (result?.status === '0x1') break;
+          if (result?.status === '0x0') { setClaimError('Payment transaction failed on-chain.'); return; }
+          if (attempt === 29) { setClaimError('Payment confirmation timed out — please try again.'); return; }
+        }
+      }
+
+      // Step 2: Register
+      setClaimStatus(launchToken ? 'Registering name and launching token…' : 'Registering name…');
       const res = await fetch(`${API_BASE}/api/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -205,6 +248,7 @@ export default function Home() {
           address,
           launchTokenOnBankr: launchToken,
           paymentToken,
+          paymentTxHash,
           feeRecipientType,
           feeRecipientValue: feeRecipientType === 'wallet' ? address : feeRecipientValue.trim(),
           tweetUrl: tweetUrl.trim() || undefined,
@@ -221,6 +265,7 @@ export default function Home() {
       setClaimError('Network error. Please try again.');
     } finally {
       setClaiming(false);
+      setClaimStatus(null);
     }
   };
 
@@ -825,7 +870,8 @@ export default function Home() {
               >
                 {claiming ? (
                   <span className="flex items-center justify-center gap-2">
-                    <span className="animate-spin">⚙️</span> Claiming...
+                    <span className="animate-spin">⚙️</span>
+                    {claimStatus || 'Claiming…'}
                   </span>
                 ) : (
                   `Claim ${name ? `${name}.bankrclub.eth` : 'your name'}`
@@ -833,7 +879,8 @@ export default function Home() {
               </button>
 
               <p className="text-gray-500 text-xs text-center">
-                One name per wallet. Permanent registration — no gas fees.
+                One name per wallet. Permanent registration
+                {availability?.isPremium ? ` — ${displayPrice} ETH payment on Base.` : ' — no gas fees.'}
               </p>
             </div>
           )}

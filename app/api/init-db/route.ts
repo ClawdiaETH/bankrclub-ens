@@ -29,5 +29,11 @@ export async function GET() {
     nonce TEXT PRIMARY KEY,
     created_at TIMESTAMPTZ DEFAULT NOW()
   )`;
+  await sql`CREATE TABLE IF NOT EXISTS payment_txhashes (
+    tx_hash TEXT PRIMARY KEY,
+    address TEXT NOT NULL,
+    name TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+  )`;
   return NextResponse.json({ ok: true, message: 'DB initialized' });
 }

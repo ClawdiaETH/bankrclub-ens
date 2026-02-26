@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkAvailability, createRegistration, getRegistrationByAddress } from '@/lib/db';
+import { checkAvailability, createRegistration, getRegistrationByAddress, isPaymentTxUsed, markPaymentTxUsed } from '@/lib/db';
 import { verifyBankrClubHolder } from '@/lib/nftVerify';
 import { FeeRecipientType } from '@/lib/bankrApi';
 import { announceRegistration } from '@/lib/neynar';
@@ -40,6 +40,8 @@ export async function POST(req: NextRequest) {
     tweetUrl,
     /** Pre-uploaded IPFS URL for the token logo (user's custom image) */
     logoUrl,
+    /** On-chain tx hash proving ETH payment was sent to treasury (premium names only) */
+    paymentTxHash,
   } = body;
 
   if (!subdomain || !address) {
@@ -128,13 +130,54 @@ export async function POST(req: NextRequest) {
   const discountedPrice = getDiscountedPremiumPrice(basePrice, token);
 
   if (isPremium) {
-    console.log(
-      `Premium claim: ${name} | base=${basePrice} ETH | token=${token} | paid=${discountedPrice} ETH`
-    );
-    return NextResponse.json(
-      { error: 'premium names (8 characters or less) require payment verification - coming soon' },
-      { status: 400, headers: corsHeaders }
-    );
+    const TREASURY = '0xf17b5dD382B048Ff4c05c1C9e4E24cfC5C6adAd9';
+    const BASE_RPC = 'https://mainnet.base.org';
+
+    if (!paymentTxHash || typeof paymentTxHash !== 'string') {
+      return NextResponse.json(
+        { error: `premium name — send ${discountedPrice} ETH to treasury first`, code: 'PAYMENT_REQUIRED', price: discountedPrice },
+        { status: 402, headers: corsHeaders }
+      );
+    }
+
+    // Check replay protection
+    const alreadyUsed = await isPaymentTxUsed(paymentTxHash);
+    if (alreadyUsed) {
+      return NextResponse.json(
+        { error: 'payment tx already used for another registration' },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    // Verify on Base
+    const rpcRes = await fetch(BASE_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionByHash', params: [paymentTxHash] }),
+    });
+    const { result: tx } = await rpcRes.json() as { result: { to: string; from: string; value: string; blockNumber: string } | null };
+
+    if (!tx || !tx.blockNumber) {
+      return NextResponse.json({ error: 'payment tx not found or not yet confirmed on Base' }, { status: 400, headers: corsHeaders });
+    }
+    if (tx.to?.toLowerCase() !== TREASURY.toLowerCase()) {
+      return NextResponse.json({ error: 'payment sent to wrong address' }, { status: 400, headers: corsHeaders });
+    }
+    if (tx.from?.toLowerCase() !== address.toLowerCase()) {
+      return NextResponse.json({ error: 'payment must be sent from your connected wallet' }, { status: 400, headers: corsHeaders });
+    }
+
+    const requiredWei = BigInt(Math.floor(discountedPrice * 1e18));
+    const paidWei = BigInt(tx.value);
+    if (paidWei < requiredWei) {
+      return NextResponse.json(
+        { error: `insufficient payment — required ${discountedPrice} ETH, received ${Number(paidWei) / 1e18} ETH` },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
+    await markPaymentTxUsed(paymentTxHash, address, name);
+    console.log(`Premium claim: ${name} | paid=${Number(paidWei) / 1e18} ETH | tx=${paymentTxHash}`);
   }
 
   // Register
