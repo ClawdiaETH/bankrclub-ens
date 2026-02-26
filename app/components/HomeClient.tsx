@@ -639,12 +639,12 @@ export default function Home() {
                           <div className="flex items-center justify-between">
                             <span className="text-orange-400 font-semibold">$BNKR</span>
                             <span className="text-gray-400 text-xs">10% off</span>
-                            <a href="https://bankr.bot/launches/0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 text-xs underline">Buy →</a>
+                            <a href="https://app.uniswap.org/swap?outputCurrency=0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b&chain=base" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 text-xs underline">Buy →</a>
                           </div>
                           <div className="flex items-center justify-between">
                             <span className="text-purple-400 font-semibold">$CLAWDIA</span>
                             <span className="text-gray-400 text-xs">25% off</span>
-                            <a href="https://bankr.bot/launches/0xbbd9aDe16525acb4B336b6dAd3b9762901522B07" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-xs underline">Buy →</a>
+                            <a href="https://app.uniswap.org/swap?outputCurrency=0xbbd9aDe16525acb4B336b6dAd3b9762901522B07&chain=base" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-xs underline">Buy →</a>
                           </div>
                         </div>
                       </div>

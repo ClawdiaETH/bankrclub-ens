@@ -79,7 +79,7 @@ export default function PaymentSelector({
             </div>
           ) : (
             <a
-              href="https://bankr.bot/launches/0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b"
+              href="https://app.uniswap.org/swap?outputCurrency=0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b&chain=base"
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
@@ -132,7 +132,7 @@ export default function PaymentSelector({
             </div>
           ) : (
             <a
-              href="https://bankr.bot/launches/0xbbd9aDe16525acb4B336b6dAd3b9762901522B07"
+              href="https://app.uniswap.org/swap?outputCurrency=0xbbd9aDe16525acb4B336b6dAd3b9762901522B07&chain=base"
               target="_blank"
               rel="noopener noreferrer"
               onClick={(e) => e.stopPropagation()}
