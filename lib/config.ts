@@ -33,15 +33,23 @@ export const ENS = {
 } as const;
 
 export const PRICING = {
-  // Free names: 6+ characters
-  FREE_MIN_LENGTH: 6,
+  // Free names: 9+ characters
+  FREE_MIN_LENGTH: 9,
 
-  // Premium name pricing (in ETH)
+  // Premium name pricing (in ETH) — 3–8 char names
   PREMIUM: {
-    THREE_CHAR: 0.05,
-    FOUR_CHAR: 0.02,
-    FIVE_CHAR: 0.01,
-    DICTIONARY: 0.01, // Minimum for dictionary words
+    THREE_CHAR:  0.05,
+    FOUR_CHAR:   0.02,
+    FIVE_CHAR:   0.01,
+    SIX_CHAR:    0.005,
+    SEVEN_CHAR:  0.003,
+    EIGHT_CHAR:  0.002,
+  },
+
+  // Token discount rates
+  DISCOUNTS: {
+    BNKR:    0.10, // 10% off
+    CLAWDIA: 0.25, // 25% off
   },
 } as const;
 

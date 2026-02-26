@@ -45,9 +45,13 @@ function validateName(name: string): { valid: boolean; reason?: string } {
 }
 
 function getPremiumPrice(name: string): number {
-  if (name.length === 3) return 0.05;
-  if (name.length === 4) return 0.02;
-  return 0.01;
+  const len = name.length;
+  if (len === 3) return 0.05;
+  if (len === 4) return 0.02;
+  if (len === 5) return 0.01;
+  if (len === 6) return 0.005;
+  if (len === 7) return 0.003;
+  return 0.002; // 8 chars
 }
 
 export async function POST(req: NextRequest) {
@@ -147,7 +151,7 @@ export async function POST(req: NextRequest) {
   }
 
   // Calculate discounted price for logging
-  const isPremium = name.length <= 5;
+  const isPremium = name.length <= 8;
   const basePrice = isPremium ? getPremiumPrice(name) : 0;
   const discountedPrice = parseFloat((basePrice * (1 - DISCOUNT[token])).toFixed(4));
 
@@ -156,7 +160,7 @@ export async function POST(req: NextRequest) {
       `Premium claim: ${name} | base=${basePrice} ETH | token=${token} | paid=${discountedPrice} ETH`
     );
     return NextResponse.json(
-      { error: 'premium names (5 characters or less) require payment verification - coming soon' },
+      { error: 'premium names (8 characters or less) require payment verification - coming soon' },
       { status: 400, headers: corsHeaders }
     );
   }

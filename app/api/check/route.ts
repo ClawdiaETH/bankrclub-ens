@@ -43,7 +43,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const isPremium = name.length <= 5;
+  const isPremium = name.length <= 8;
   let available = false;
   try {
     available = await checkAvailability(name);
@@ -52,13 +52,16 @@ export async function GET(req: NextRequest) {
     available = true;
   }
 
-  const basePrice = isPremium
-    ? name.length === 3
-      ? 0.05
-      : name.length === 4
-      ? 0.02
-      : 0.01
-    : 0;
+  function getPremiumPrice(len: number): number {
+    if (len === 3) return 0.05;
+    if (len === 4) return 0.02;
+    if (len === 5) return 0.01;
+    if (len === 6) return 0.005;
+    if (len === 7) return 0.003;
+    return 0.002; // 8 chars
+  }
+
+  const basePrice = isPremium ? getPremiumPrice(name.length) : 0;
 
   return NextResponse.json(
     {
@@ -67,9 +70,9 @@ export async function GET(req: NextRequest) {
       price: basePrice,
       prices: isPremium
         ? {
-            eth: basePrice,
-            bnkr: parseFloat((basePrice * 0.9).toFixed(4)),     // 10% off
-            clawdia: parseFloat((basePrice * 0.75).toFixed(4)), // 25% off
+            eth:     basePrice,
+            bnkr:    parseFloat((basePrice * 0.90).toFixed(4)),  // 10% off
+            clawdia: parseFloat((basePrice * 0.75).toFixed(4)),  // 25% off
           }
         : null,
       name,

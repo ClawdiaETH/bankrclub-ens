@@ -401,13 +401,16 @@ export default function Home() {
               <div className="grid md:grid-cols-3 gap-6 p-8">
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
                   <div className="text-3xl mb-3">🆓</div>
-                  <h3 className="text-lg font-bold text-white mb-2">Free Basic Names</h3>
-                  <p className="text-gray-400 text-sm">6+ characters, yours forever</p>
+                  <h3 className="text-lg font-bold text-white mb-2">Free Names</h3>
+                  <p className="text-gray-400 text-sm">9+ characters, yours forever</p>
                 </div>
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
                   <div className="text-3xl mb-3">⭐</div>
                   <h3 className="text-lg font-bold text-white mb-2">Premium Names</h3>
-                  <p className="text-gray-400 text-sm">3-5 char names from 0.01 ETH</p>
+                  <p className="text-gray-400 text-sm">
+                    3–8 chars from 0.002 ETH<br />
+                    <span className="text-orange-400">10% off with $BNKR · 25% off with $CLAWDIA</span>
+                  </p>
                 </div>
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
                   <div className="text-3xl mb-3">🪙</div>
