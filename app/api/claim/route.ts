@@ -91,6 +91,15 @@ export async function POST(req: NextRequest) {
     feeRecipientType && VALID_FEE_RECIPIENT_TYPES.includes(feeRecipientType)
       ? feeRecipientType
       : 'wallet';
+  const normalizedFeeRecipientValue =
+    typeof feeRecipientValue === 'string' ? feeRecipientValue.trim() : '';
+
+  if (launchTokenOnBankr && recipientType !== 'wallet' && !normalizedFeeRecipientValue) {
+    return NextResponse.json(
+      { error: 'fee recipient value required for selected type' },
+      { status: 400, headers: corsHeaders }
+    );
+  }
 
   // Validate tweetUrl if provided
   let validatedTweetUrl: string | undefined;
@@ -171,16 +180,6 @@ export async function POST(req: NextRequest) {
   // Optional: launch token on Bankr
   let tokenInfo = null;
   if (launchTokenOnBankr) {
-    const normalizedFeeRecipientValue =
-      typeof feeRecipientValue === 'string' ? feeRecipientValue.trim() : '';
-
-    if (recipientType !== 'wallet' && !normalizedFeeRecipientValue) {
-      return NextResponse.json(
-        { error: 'fee recipient value required for selected type' },
-        { status: 400, headers: corsHeaders }
-      );
-    }
-
     // Build fee recipient — non-wallet types use the user-supplied value
     const feeRecipient: FeeRecipient =
       recipientType === 'wallet'
