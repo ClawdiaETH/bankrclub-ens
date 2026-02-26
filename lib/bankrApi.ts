@@ -44,17 +44,35 @@ export interface TokenLaunchOptions {
   image?: string;
 }
 
+export type LaunchError = 'rate_limited' | 'api_error' | 'timeout' | 'unknown';
+
+export interface LaunchResult {
+  data: BankrDeployResponse | null;
+  error?: LaunchError;
+}
+
+/** Strip @ prefix from Twitter/X handles — Bankr expects bare username */
+function normalizeXHandle(value: string): string {
+  return value.startsWith('@') ? value.slice(1) : value;
+}
+
+function normalizeFeeRecipientValue(type: FeeRecipientType, value: string): string {
+  if (type === 'x') return normalizeXHandle(value.trim());
+  return value.trim();
+}
+
 export async function launchToken(
   subdomain: string,
   holderAddress: string,
   options?: TokenLaunchOptions
-): Promise<BankrDeployResponse | null> {
+): Promise<LaunchResult> {
   const partnerKey = process.env.BANKR_PARTNER_KEY;
   const simulateOnly = !partnerKey || partnerKey === 'pending';
 
-  const feeRecipient: FeeRecipient = options?.feeRecipient ?? {
-    type: 'wallet',
-    value: holderAddress,
+  const rawFeeRecipient = options?.feeRecipient ?? { type: 'wallet' as FeeRecipientType, value: holderAddress };
+  const feeRecipient: FeeRecipient = {
+    type: rawFeeRecipient.type,
+    value: normalizeFeeRecipientValue(rawFeeRecipient.type, rawFeeRecipient.value),
   };
 
   const payload: BankrDeployRequest = {
@@ -79,15 +97,27 @@ export async function launchToken(
       method: 'POST',
       headers,
       body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(15_000), // 15s — avoid hanging the claim endpoint
     });
+
+    if (res.status === 429) {
+      console.error('Bankr API rate limit hit (50 deploys/24h)');
+      return { data: null, error: 'rate_limited' };
+    }
+
     if (!res.ok) {
       const err = await res.text();
       console.error('Bankr API error:', res.status, err);
-      return null;
+      return { data: null, error: 'api_error' };
     }
-    return await res.json();
+
+    return { data: await res.json() };
   } catch (e) {
+    if (e instanceof Error && e.name === 'TimeoutError') {
+      console.error('Bankr API timed out after 15s');
+      return { data: null, error: 'timeout' };
+    }
     console.error('Bankr API fetch failed:', e);
-    return null;
+    return { data: null, error: 'unknown' };
   }
 }

@@ -46,13 +46,16 @@ interface ClaimResult {
   address: string;
   paymentToken?: PaymentToken;
   tokenInfo?: {
-    tokenAddress: string;
-    tokenSymbol: string;
-    poolId: string;
+    // Success
+    tokenAddress?: string;
+    tokenSymbol?: string;
+    poolId?: string;
     txHash?: string;
     simulated?: boolean;
     feeDistribution?: FeeDistribution;
     feeRecipient?: { type: FeeRecipientType; value: string };
+    // Error
+    error?: string;
   } | null;
 }
 
@@ -315,7 +318,12 @@ export default function Home() {
                     <p className="text-green-400 font-semibold text-sm">💸 {discountLabel}</p>
                   </div>
                 )}
-                {claimResult.tokenInfo && (
+                {claimResult.tokenInfo?.error && (
+                  <div className="bg-gray-800 rounded-xl p-4 border border-yellow-700">
+                    <p className="text-yellow-400 text-sm">⚠️ {claimResult.tokenInfo.error}</p>
+                  </div>
+                )}
+                {claimResult.tokenInfo && !claimResult.tokenInfo.error && (
                   <div className="bg-gray-800 rounded-xl p-6 border border-orange-500 space-y-3 text-left">
                     <p className="text-orange-400 font-semibold text-center">
                       🚀 Token launched on Bankr!

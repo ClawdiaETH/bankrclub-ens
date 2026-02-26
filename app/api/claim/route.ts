@@ -2,6 +2,13 @@ import { NextRequest, NextResponse } from 'next/server';
 import { checkAvailability, createRegistration, updateTokenInfo, getRegistrationByAddress } from '@/lib/db';
 import { verifyBankrClubHolder } from '@/lib/nftVerify';
 import { launchToken, FeeRecipient, FeeRecipientType } from '@/lib/bankrApi';
+
+const LAUNCH_ERROR_MESSAGES: Record<string, string> = {
+  rate_limited: 'Token launch limit reached for today — try again tomorrow',
+  api_error:    'Bankr API error — your name is registered, token launch failed',
+  timeout:      'Bankr API timed out — your name is registered, token launch failed',
+  unknown:      'Token launch failed — your name is registered',
+};
 import { getNftImage } from '@/lib/nftMeta';
 
 export const dynamic = 'force-dynamic';
@@ -207,13 +214,18 @@ export async function POST(req: NextRequest) {
       tokenImage = await getNftImage(tokenId);
     }
 
-    const bankrResult = await launchToken(name, address, {
+    const { data: bankrResult, error: launchError } = await launchToken(name, address, {
       feeRecipient,
       tweetUrl: validatedTweetUrl,
       image: tokenImage,
     });
 
-    if (bankrResult?.success) {
+    if (launchError) {
+      // Registration succeeded but token launch failed — return success with a warning
+      tokenInfo = {
+        error: LAUNCH_ERROR_MESSAGES[launchError] ?? LAUNCH_ERROR_MESSAGES.unknown,
+      };
+    } else if (bankrResult?.success) {
       tokenInfo = {
         tokenAddress: bankrResult.tokenAddress,
         tokenSymbol: name.toUpperCase().slice(0, 10),
