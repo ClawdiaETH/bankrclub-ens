@@ -208,7 +208,8 @@ export default function Home() {
       // Step 1: Send ETH payment for premium names
       if (availability.isPremium && displayPrice) {
         const TREASURY = '0xf17b5dD382B048Ff4c05c1C9e4E24cfC5C6adAd9';
-        setClaimStatus(`Sending ${displayPrice} ETH payment…`);
+        const discountNote = paymentToken !== 'ETH' ? ` (${paymentToken} holder rate)` : '';
+        setClaimStatus(`Sending ${displayPrice} ETH${discountNote}…`);
         try {
           const hash = await sendTransactionAsync({
             to: TREASURY as `0x${string}`,
