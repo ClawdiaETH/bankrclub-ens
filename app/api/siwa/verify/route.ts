@@ -3,7 +3,7 @@
 // Returns: { receipt, agentId, address }
 import { verifySIWA } from '@buildersgarden/siwa';
 import { createReceipt } from '@buildersgarden/siwa/receipt';
-import { corsJson, siwaOptions } from '@buildersgarden/siwa/next';
+import { corsJson } from '@buildersgarden/siwa/next';
 import { createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';
 import { consumeNonce } from '@/lib/db';
@@ -66,4 +66,13 @@ export async function POST(req: Request) {
   }
 }
 
-export { siwaOptions as OPTIONS };
+export async function OPTIONS() {
+  return new Response(null, {
+    status: 204,
+    headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Methods': 'POST, OPTIONS',
+      'Access-Control-Allow-Headers': 'Content-Type, X-SIWA-Receipt, Signature, Signature-Input, Content-Digest',
+    },
+  });
+}
