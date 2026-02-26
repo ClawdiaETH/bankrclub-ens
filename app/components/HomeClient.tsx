@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
 import { useAccount, useReadContract } from 'wagmi';
 import TypewriterSubdomain from './TypewriterSubdomain';
@@ -109,6 +109,19 @@ export default function Home() {
 
   // Advanced options state
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+  const pricingRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!showPricing) return;
+    const handler = (e: MouseEvent) => {
+      if (pricingRef.current && !pricingRef.current.contains(e.target as Node)) {
+        setShowPricing(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showPricing]);
   const [tweetUrl, setTweetUrl] = useState('');
 
   useEffect(() => {
@@ -523,31 +536,54 @@ export default function Home() {
               <div>
                 <div className="flex items-center justify-between mb-2">
                   <label className="text-gray-400 text-sm">Choose your name</label>
-                  <details className="group relative">
-                    <summary className="text-gray-500 text-xs cursor-pointer hover:text-gray-300 transition-colors list-none select-none">
-                      Pricing ▾
-                    </summary>
-                    <div className="absolute right-0 top-6 z-10 bg-gray-800 border border-gray-700 rounded-xl p-3 shadow-xl w-64 text-xs">
-                      <p className="text-gray-400 font-semibold mb-2">Name pricing</p>
-                      <div className="grid grid-cols-3 gap-x-3 gap-y-1">
-                        <span className="text-gray-500">Length</span>
-                        <span className="text-gray-500">ETH</span>
-                        <span className="text-gray-500">Best price</span>
-                        <span className="text-gray-300">3 chars</span><span className="text-white">0.05</span><span className="text-purple-400">0.0375 ($CLAWDIA)</span>
-                        <span className="text-gray-300">4 chars</span><span className="text-white">0.02</span><span className="text-purple-400">0.015</span>
-                        <span className="text-gray-300">5 chars</span><span className="text-white">0.01</span><span className="text-purple-400">0.0075</span>
-                        <span className="text-gray-300">6 chars</span><span className="text-white">0.005</span><span className="text-purple-400">0.00375</span>
-                        <span className="text-gray-300">7 chars</span><span className="text-white">0.003</span><span className="text-purple-400">0.00225</span>
-                        <span className="text-gray-300">8 chars</span><span className="text-white">0.002</span><span className="text-purple-400">0.0015</span>
-                        <span className="text-green-400 font-semibold">9+ chars</span><span className="text-green-400 font-semibold col-span-2">Free!</span>
+                  <div className="relative" ref={pricingRef}>
+                    <button
+                      type="button"
+                      onClick={() => setShowPricing(p => !p)}
+                      className="text-gray-500 text-xs cursor-pointer hover:text-gray-300 transition-colors select-none"
+                    >
+                      Pricing {showPricing ? '▴' : '▾'}
+                    </button>
+                    {showPricing && (
+                      <div className="absolute right-0 top-7 z-20 bg-gray-900 border border-gray-700 rounded-2xl p-5 shadow-2xl w-80 text-sm">
+                        <p className="text-white font-semibold mb-3">Name pricing</p>
+                        <div className="grid grid-cols-3 gap-x-4 gap-y-2 mb-4">
+                          <span className="text-gray-500 text-xs uppercase tracking-wide">Length</span>
+                          <span className="text-gray-500 text-xs uppercase tracking-wide">ETH</span>
+                          <span className="text-gray-500 text-xs uppercase tracking-wide">Best price</span>
+                          {[
+                            ['3 chars', '0.05',  '0.0375'],
+                            ['4 chars', '0.02',  '0.015'],
+                            ['5 chars', '0.01',  '0.0075'],
+                            ['6 chars', '0.005', '0.00375'],
+                            ['7 chars', '0.003', '0.00225'],
+                            ['8 chars', '0.002', '0.0015'],
+                          ].map(([len, price, best]) => (
+                            <Fragment key={len}>
+                              <span className="text-gray-300">{len}</span>
+                              <span className="text-white font-mono">{price}</span>
+                              <span className="text-purple-400 font-mono">{best}</span>
+                            </Fragment>
+                          ))}
+                          <span className="text-green-400 font-semibold">9+ chars</span>
+                          <span className="text-green-400 font-semibold font-mono col-span-2">Free!</span>
+                        </div>
+                        <div className="pt-3 border-t border-gray-700 space-y-2">
+                          <p className="text-gray-400 text-xs">Hold tokens to unlock discounts:</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-orange-400 font-semibold">$BNKR</span>
+                            <span className="text-gray-400 text-xs">10% off</span>
+                            <a href="https://bankr.bot/launches/0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 text-xs underline">Buy →</a>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-purple-400 font-semibold">$CLAWDIA</span>
+                            <span className="text-gray-400 text-xs">25% off</span>
+                            <a href="https://bankr.bot/launches/0xbbd9aDe16525acb4B336b6dAd3b9762901522B07" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-xs underline">Buy →</a>
+                          </div>
+                        </div>
                       </div>
-                      <div className="mt-3 pt-2 border-t border-gray-700 space-y-1">
-                        <p className="text-gray-500">Discounts (hold to unlock):</p>
-                        <p className="text-orange-400">$BNKR — 10% off · <a href="https://bankr.bot/launches/0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b" target="_blank" rel="noopener noreferrer" className="underline hover:text-orange-300">Buy →</a></p>
-                        <p className="text-purple-400">$CLAWDIA — 25% off · <a href="https://bankr.bot/launches/0xbbd9aDe16525acb4B336b6dAd3b9762901522B07" target="_blank" rel="noopener noreferrer" className="underline hover:text-purple-300">Buy →</a></p>
-                      </div>
-                    </div>
-                  </details>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <div className="relative flex-1">
