@@ -352,6 +352,10 @@ export default function Home() {
                           <span className="text-gray-300">
                             {bpsToPercent(claimResult.tokenInfo.feeDistribution.bankr.bps)}%
                           </span>
+                          <span className="text-gray-400">Ecosystem</span>
+                          <span className="text-gray-300">
+                            {bpsToPercent(claimResult.tokenInfo.feeDistribution.ecosystem.bps)}%
+                          </span>
                           <span className="text-gray-400">Protocol</span>
                           <span className="text-gray-300">
                             {bpsToPercent(claimResult.tokenInfo.feeDistribution.protocol.bps)}%

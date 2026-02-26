@@ -30,6 +30,8 @@ const RESERVED = [
 ];
 
 const VALID_FEE_RECIPIENT_TYPES: FeeRecipientType[] = ['wallet', 'x', 'farcaster', 'ens'];
+const PINATA_GATEWAY_HOST = 'gateway.pinata.cloud';
+const PINATA_GATEWAY_PATH_PREFIX = '/ipfs/';
 
 function validateName(name: string): { valid: boolean; reason?: string } {
   if (!name || name.length < 3) return { valid: false, reason: 'minimum 3 characters' };
@@ -180,10 +182,14 @@ export async function POST(req: NextRequest) {
     // Determine token logo: prefer user-uploaded URL, fall back to NFT art
     let tokenImage: string | undefined;
     if (logoUrl && typeof logoUrl === 'string') {
-      // Validate it's an IPFS or HTTPS URL we pinned
+      // Validate it's the Pinata gateway URL returned by /api/upload
       try {
         const u = new URL(logoUrl);
-        if (u.protocol === 'https:' || u.protocol === 'ipfs:') tokenImage = logoUrl;
+        const isPinnedPinataUrl =
+          u.protocol === 'https:' &&
+          u.hostname === PINATA_GATEWAY_HOST &&
+          u.pathname.startsWith(PINATA_GATEWAY_PATH_PREFIX);
+        if (isPinnedPinataUrl) tokenImage = logoUrl;
       } catch { /* ignore invalid */ }
     }
     if (!tokenImage) {

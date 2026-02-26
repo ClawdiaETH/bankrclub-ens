@@ -43,6 +43,7 @@ export async function getNftImage(
     const rpcRes = await fetch(BASE_RPC, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
+      signal: AbortSignal.timeout(5000),
       body: JSON.stringify({
         jsonrpc: '2.0',
         method: 'eth_call',

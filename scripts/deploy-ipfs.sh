@@ -40,7 +40,7 @@ echo "✅ CID: $CID"
 echo "🔗 Updating bankrclub.eth contenthash..."
 
 # Encode CIDv0 (Qm...) as ENS contenthash:
-# 0xe3 0x01 = ipfs-ns varint codec, then raw base58-decoded CID bytes (the multihash)
+# 0xe3 0x01 = ipfs-ns varint codec, then CIDv1 header 0x01 0x70 (version + dag-pb), then multihash bytes
 CONTENTHASH=$(python3 -c "
 ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 def b58decode(s):
@@ -55,7 +55,7 @@ def b58decode(s):
     return bytes(reversed(result))
 cid = '$CID'
 cid_bytes = b58decode(cid)
-print('0xe301' + cid_bytes.hex())
+print('0xe3010170' + cid_bytes.hex())
 ")
 
 cast send 0x31D23782992093B92Fa13d9cD56b3C02EBC61927 \
