@@ -58,7 +58,7 @@ cid_bytes = b58decode(cid)
 print('0xe3010170' + cid_bytes.hex())
 ")
 
-cast send 0x31D23782992093B92Fa13d9cD56b3C02EBC61927 \
+cast send 0x3a62109CCAd858907A5750b906618eA7B433d3a3 \
   "setContenthash(bytes32,bytes)" \
   "$(cast namehash bankrclub.eth)" \
   "$CONTENTHASH" \

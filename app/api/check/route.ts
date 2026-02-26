@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAvailability } from '@/lib/db';
+import {
+  getDiscountedPremiumPrice,
+  getPremiumPrice,
+  isPremiumName,
+  validateName,
+} from '@/lib/registration';
 
 export const dynamic = 'force-dynamic';
 
@@ -11,22 +17,6 @@ const corsHeaders = {
 
 export async function OPTIONS() {
   return new NextResponse(null, { status: 200, headers: corsHeaders });
-}
-
-const RESERVED = [
-  'bankr', 'admin', 'www', 'api', 'app', 'mail',
-  'help', 'support', 'team', 'clawdia',
-];
-
-function validateName(name: string): { valid: boolean; reason?: string } {
-  if (!name || name.length < 3) return { valid: false, reason: 'minimum 3 characters' };
-  if (name.length > 32) return { valid: false, reason: 'maximum 32 characters' };
-  if (!/^[a-z0-9-]+$/.test(name))
-    return { valid: false, reason: 'lowercase letters, numbers, hyphens only' };
-  if (name.startsWith('-') || name.endsWith('-'))
-    return { valid: false, reason: 'cannot start or end with hyphen' };
-  if (RESERVED.includes(name)) return { valid: false, reason: 'reserved name' };
-  return { valid: true };
 }
 
 export async function GET(req: NextRequest) {
@@ -43,7 +33,7 @@ export async function GET(req: NextRequest) {
     );
   }
 
-  const isPremium = name.length <= 5;
+  const isPremium = isPremiumName(name);
   let available = false;
   try {
     available = await checkAvailability(name);
@@ -52,13 +42,7 @@ export async function GET(req: NextRequest) {
     available = true;
   }
 
-  const basePrice = isPremium
-    ? name.length === 3
-      ? 0.05
-      : name.length === 4
-      ? 0.02
-      : 0.01
-    : 0;
+  const basePrice = isPremium ? getPremiumPrice(name) : 0;
 
   return NextResponse.json(
     {
@@ -67,9 +51,9 @@ export async function GET(req: NextRequest) {
       price: basePrice,
       prices: isPremium
         ? {
-            eth: basePrice,
-            bnkr: parseFloat((basePrice * 0.9).toFixed(4)),     // 10% off
-            clawdia: parseFloat((basePrice * 0.75).toFixed(4)), // 25% off
+            eth: getDiscountedPremiumPrice(basePrice, 'ETH'),
+            bnkr: getDiscountedPremiumPrice(basePrice, 'BNKR'),
+            clawdia: getDiscountedPremiumPrice(basePrice, 'CLAWDIA'),
           }
         : null,
       name,

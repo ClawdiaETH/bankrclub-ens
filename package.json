@@ -10,6 +10,7 @@
     "lint": "next lint"
   },
   "dependencies": {
+    "@buildersgarden/siwa": "^0.0.21",
     "@neondatabase/serverless": "^1.0.2",
     "@rainbow-me/rainbowkit": "^2.2.3",
     "@tanstack/react-query": "^5.62.8",
