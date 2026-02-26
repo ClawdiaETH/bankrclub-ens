@@ -97,7 +97,8 @@ export async function POST(req: NextRequest) {
   if (tweetUrl && typeof tweetUrl === 'string') {
     try {
       const u = new URL(tweetUrl);
-      if (u.hostname === 'x.com' || u.hostname === 'twitter.com') {
+      const normalizedHostname = u.hostname.toLowerCase().replace(/^www\./, '');
+      if (normalizedHostname === 'x.com' || normalizedHostname === 'twitter.com') {
         validatedTweetUrl = tweetUrl;
       }
     } catch {
@@ -173,11 +174,18 @@ export async function POST(req: NextRequest) {
     const normalizedFeeRecipientValue =
       typeof feeRecipientValue === 'string' ? feeRecipientValue.trim() : '';
 
+    if (recipientType !== 'wallet' && !normalizedFeeRecipientValue) {
+      return NextResponse.json(
+        { error: 'fee recipient value required for selected type' },
+        { status: 400, headers: corsHeaders }
+      );
+    }
+
     // Build fee recipient — non-wallet types use the user-supplied value
     const feeRecipient: FeeRecipient =
       recipientType === 'wallet'
         ? { type: 'wallet', value: address }
-        : { type: recipientType, value: normalizedFeeRecipientValue || address };
+        : { type: recipientType, value: normalizedFeeRecipientValue };
 
     // Determine token logo: prefer user-uploaded URL, fall back to NFT art
     let tokenImage: string | undefined;
