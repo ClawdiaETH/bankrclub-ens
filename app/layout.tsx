@@ -3,7 +3,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 
 export const metadata: Metadata = {
-  title: "BankrClub ENS | Claim Your Subdomain",
+  title: "BankrClub ENS | Claim your subdomain",
   description: "Register yourname.bankrclub.eth - exclusive ENS subdomains for BankrClub NFT holders",
 };
 

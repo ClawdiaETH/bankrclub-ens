@@ -1,5 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkAvailability, createRegistration, getRegistrationByAddress } from '@/lib/db';
+import {
+  checkAvailability,
+  createPremiumRegistration,
+  createRegistration,
+  getRegistrationByAddress,
+  RegistrationConflictError,
+} from '@/lib/db';
+import { getTokenPriceInEth, calcTokenAmount, toTokenWei, BNKR_ADDRESS, CLAWDIA_ADDRESS, TRANSFER_TOPIC } from '@/lib/tokenPrice';
 import { verifyBankrClubHolder } from '@/lib/nftVerify';
 import { FeeRecipientType } from '@/lib/bankrApi';
 import { announceRegistration } from '@/lib/neynar';
@@ -40,6 +47,8 @@ export async function POST(req: NextRequest) {
     tweetUrl,
     /** Pre-uploaded IPFS URL for the token logo (user's custom image) */
     logoUrl,
+    /** On-chain tx hash proving ETH payment was sent to treasury (premium names only) */
+    paymentTxHash,
   } = body;
 
   if (!subdomain || !address) {
@@ -97,7 +106,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'BankrClub NFT required' }, { status: 403, headers: corsHeaders });
   }
 
-  // Enforce one-per-wallet restriction
+  // Enforce one-per-wallet restriction before premium payment verification
   try {
     const existingRegistration = await getRegistrationByAddress(address);
     if (existingRegistration) {
@@ -128,27 +137,123 @@ export async function POST(req: NextRequest) {
   const discountedPrice = getDiscountedPremiumPrice(basePrice, token);
 
   if (isPremium) {
-    console.log(
-      `Premium claim: ${name} | base=${basePrice} ETH | token=${token} | paid=${discountedPrice} ETH`
-    );
-    return NextResponse.json(
-      { error: 'premium names (8 characters or less) require payment verification - coming soon' },
-      { status: 400, headers: corsHeaders }
-    );
+    const TREASURY = '0xf17b5dD382B048Ff4c05c1C9e4E24cfC5C6adAd9';
+    const BASE_RPC = 'https://mainnet.base.org';
+
+    if (!paymentTxHash || typeof paymentTxHash !== 'string') {
+      return NextResponse.json(
+        { error: `premium name — payment required`, code: 'PAYMENT_REQUIRED', price: discountedPrice, token },
+        { status: 402, headers: corsHeaders }
+      );
+    }
+
+    // Get tx receipt (works only post-confirmation)
+    const receiptRes = await fetch(BASE_RPC, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [paymentTxHash] }),
+    });
+    const { result: receipt } = await receiptRes.json() as {
+      result: { status: string; from: string; to: string; logs: Array<{ address: string; topics: string[]; data: string }> } | null
+    };
+
+    if (!receipt) return NextResponse.json({ error: 'tx not found or not yet confirmed on Base' }, { status: 400, headers: corsHeaders });
+    if (receipt.status !== '0x1') return NextResponse.json({ error: 'payment transaction failed on-chain' }, { status: 400, headers: corsHeaders });
+    if (receipt.from?.toLowerCase() !== address.toLowerCase()) {
+      return NextResponse.json({ error: 'payment must be sent from your connected wallet' }, { status: 400, headers: corsHeaders });
+    }
+
+    if (token === 'ETH') {
+      // ETH payment: check via eth_getTransactionByHash for value field
+      const txRes = await fetch(BASE_RPC, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 2, method: 'eth_getTransactionByHash', params: [paymentTxHash] }),
+      });
+      const { result: tx } = await txRes.json() as { result: { to: string; value: string } | null };
+      if (!tx || tx.to?.toLowerCase() !== TREASURY.toLowerCase()) {
+        return NextResponse.json({ error: 'ETH not sent to treasury address' }, { status: 400, headers: corsHeaders });
+      }
+      const requiredWei = BigInt(Math.floor(discountedPrice * 1e18));
+      const paidWei = BigInt(tx.value);
+      if (paidWei < requiredWei) {
+        return NextResponse.json({ error: `insufficient ETH — required ${discountedPrice}, received ${Number(paidWei) / 1e18}` }, { status: 400, headers: corsHeaders });
+      }
+    } else {
+      // ERC20 payment (BNKR or CLAWDIA): verify Transfer event in receipt logs
+      const tokenAddress = token === 'BNKR' ? BNKR_ADDRESS : CLAWDIA_ADDRESS;
+      const treasuryPadded = '0x000000000000000000000000' + TREASURY.slice(2).toLowerCase();
+      const senderPadded   = '0x000000000000000000000000' + address.slice(2).toLowerCase();
+
+      const transferLog = receipt.logs.find(log =>
+        log.address.toLowerCase() === tokenAddress.toLowerCase() &&
+        log.topics[0]?.toLowerCase() === TRANSFER_TOPIC &&
+        log.topics[1]?.toLowerCase() === senderPadded &&
+        log.topics[2]?.toLowerCase() === treasuryPadded
+      );
+
+      if (!transferLog) {
+        return NextResponse.json({ error: `no ${token} Transfer to treasury found in tx` }, { status: 400, headers: corsHeaders });
+      }
+
+      // Verify amount — fetch current price, allow 20% slippage tolerance
+      try {
+        const tokenPriceInEth = await getTokenPriceInEth(tokenAddress);
+        const requiredTokens = calcTokenAmount(discountedPrice, tokenPriceInEth);
+        const minAccepted = toTokenWei(requiredTokens * 0.80); // 20% slippage tolerance
+        const paidTokenWei = BigInt(transferLog.data);
+        if (paidTokenWei < minAccepted) {
+          return NextResponse.json({
+            error: `insufficient ${token} — required ~${requiredTokens.toFixed(2)}, received ${Number(paidTokenWei) / 1e18}`
+          }, { status: 400, headers: corsHeaders });
+        }
+      } catch (error) {
+        console.warn('Price check failed — rejecting premium claim', error);
+        return NextResponse.json({
+          error: `unable to verify ${token} payment amount right now, please try again`
+        }, { status: 503, headers: corsHeaders });
+      }
+    }
+
+    console.log(`Premium claim: ${name} | token=${token} | price=${discountedPrice} ETH equiv | tx=${paymentTxHash}`);
   }
 
   // Register
   let registration: Record<string, unknown>;
   try {
-    registration = await createRegistration({
-      subdomain: name,
-      address,
-      tokenId,
-      isPremium,
-      paymentToken: token,
-      premiumPaidEth: isPremium ? discountedPrice : undefined,
-    });
+    if (isPremium) {
+      registration = await createPremiumRegistration({
+        subdomain: name,
+        address,
+        tokenId,
+        isPremium,
+        paymentToken: token,
+        premiumPaidEth: discountedPrice,
+        paymentTxHash: paymentTxHash as string,
+      });
+    } else {
+      registration = await createRegistration({
+        subdomain: name,
+        address,
+        tokenId,
+        isPremium,
+        paymentToken: token,
+        premiumPaidEth: undefined,
+      });
+    }
   } catch (e) {
+    if (e instanceof RegistrationConflictError) {
+      if (e.reason === 'PAYMENT_TX_USED') {
+        return NextResponse.json({ error: 'payment tx already used for another registration' }, { status: 400, headers: corsHeaders });
+      }
+      return NextResponse.json(
+        { error: 'one name per wallet - you already have a registration' },
+        { status: 409, headers: corsHeaders }
+      );
+    }
+    if (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: string }).code === '23505') {
+      return NextResponse.json({ error: 'name already taken' }, { status: 409, headers: corsHeaders });
+    }
     console.error('Registration failed:', e);
     return NextResponse.json({ error: 'registration failed' }, { status: 500, headers: corsHeaders });
   }

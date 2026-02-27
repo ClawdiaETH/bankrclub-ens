@@ -1,8 +1,10 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, useReadContract } from 'wagmi';
+import { useAccount, useReadContract, useSendTransaction, useWriteContract } from 'wagmi';
+import { parseEther } from 'viem';
+import { getTokenPriceInEth, calcTokenAmount, toTokenWei, BNKR_ADDRESS, CLAWDIA_ADDRESS } from '@/lib/tokenPrice';
 import TypewriterSubdomain from './TypewriterSubdomain';
 import PaymentSelector, { PaymentToken } from './PaymentSelector';
 import { getDiscountTokenBalances, TokenBalances } from '@/lib/tokenBalances';
@@ -72,6 +74,10 @@ function bpsToPercent(bps: number) {
 
 export default function Home() {
   const { address, isConnected } = useAccount();
+  const { sendTransactionAsync } = useSendTransaction();
+  const { writeContractAsync } = useWriteContract();
+  const [tokenAmount, setTokenAmount] = useState<number | null>(null);
+  const [tokenPriceFetching, setTokenPriceFetching] = useState(false);
 
   const { data: nftBalance } = useReadContract({
     address: BANKRCLUB_NFT,
@@ -109,6 +115,20 @@ export default function Home() {
 
   // Advanced options state
   const [showAdvanced, setShowAdvanced] = useState(false);
+  const [showPricing, setShowPricing] = useState(false);
+  const pricingRef = useRef<HTMLDivElement>(null);
+
+
+  useEffect(() => {
+    if (!showPricing) return;
+    const handler = (e: MouseEvent) => {
+      if (pricingRef.current && !pricingRef.current.contains(e.target as Node)) {
+        setShowPricing(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showPricing]);
   const [tweetUrl, setTweetUrl] = useState('');
 
   useEffect(() => {
@@ -173,29 +193,122 @@ export default function Home() {
     return availability.price;
   })();
 
+  // Fetch token price when BNKR/CLAWDIA selected and name has a premium price
+  useEffect(() => {
+    if (paymentToken === 'ETH' || !displayPrice) {
+      setTokenAmount(null);
+      return;
+    }
+    const tokenAddress = paymentToken === 'BNKR' ? BNKR_ADDRESS : CLAWDIA_ADDRESS;
+    setTokenPriceFetching(true);
+    getTokenPriceInEth(tokenAddress)
+      .then(price => setTokenAmount(calcTokenAmount(displayPrice, price)))
+      .catch(() => setTokenAmount(null))
+      .finally(() => setTokenPriceFetching(false));
+  }, [paymentToken, displayPrice]);
+
+
   // Fee recipient validation only matters when token launch is enabled
   const feeRecipientValid =
     !launchToken ||
     feeRecipientType === 'wallet' ||
     (feeRecipientValue.trim().length > 0);
 
+  const [claimStatus, setClaimStatus] = useState<string | null>(null);
+
   const handleClaim = async () => {
     if (!address || !availability?.available || !feeRecipientValid) return;
     setClaiming(true);
     setClaimError(null);
+    setClaimStatus(null);
+
+    let paymentTxHash: string | undefined;
+
     try {
+      const baseClaimPayload = {
+        subdomain: name.toLowerCase().trim(),
+        address,
+        launchTokenOnBankr: launchToken,
+        paymentToken,
+        feeRecipientType,
+        feeRecipientValue: feeRecipientType === 'wallet' ? address : feeRecipientValue.trim(),
+        tweetUrl: tweetUrl.trim() || undefined,
+        logoUrl: logoMode === 'custom' && customLogoUrl ? customLogoUrl : undefined,
+      };
+
+      // Step 1: Send payment for premium names (ETH or ERC20 token)
+      if (availability.isPremium && displayPrice) {
+        setClaimStatus('Checking eligibility…');
+        const preflightRes = await fetch(`${API_BASE}/api/claim`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(baseClaimPayload),
+        });
+        const preflightData = await preflightRes.json();
+        if (preflightRes.status !== 402 || preflightData.code !== 'PAYMENT_REQUIRED') {
+          setClaimError(preflightData.error || 'Claim failed');
+          return;
+        }
+
+        const TREASURY = '0xf17b5dD382B048Ff4c05c1C9e4E24cfC5C6adAd9';
+        const ERC20_ABI = [{
+          name: 'transfer', type: 'function' as const,
+          inputs: [{ name: 'to', type: 'address' }, { name: 'amount', type: 'uint256' }],
+          outputs: [{ name: '', type: 'bool' }], stateMutability: 'nonpayable' as const,
+        }] as const;
+
+        try {
+          if (paymentToken === 'ETH') {
+            setClaimStatus(`Sending ${displayPrice} ETH…`);
+            paymentTxHash = await sendTransactionAsync({
+              to: TREASURY as `0x${string}`,
+              value: parseEther(String(displayPrice)),
+              chainId: 8453,
+            });
+          } else {
+            const tokenAddress = (paymentToken === 'BNKR' ? BNKR_ADDRESS : CLAWDIA_ADDRESS) as `0x${string}`;
+            setClaimStatus(`Getting $${paymentToken} price…`);
+            const tokenPriceInEth = await getTokenPriceInEth(tokenAddress);
+            const amount = toTokenWei(calcTokenAmount(displayPrice, tokenPriceInEth));
+            const displayAmt = (Number(amount) / 1e18).toFixed(2);
+            setClaimStatus(`Sending ${displayAmt} $${paymentToken}…`);
+            paymentTxHash = await writeContractAsync({
+              address: tokenAddress,
+              abi: ERC20_ABI,
+              functionName: 'transfer',
+              args: [TREASURY as `0x${string}`, amount],
+              chainId: 8453,
+            });
+          }
+        } catch (e: unknown) {
+          const msg = e instanceof Error ? e.message : String(e);
+          setClaimError(msg.includes('rejected') || msg.includes('denied') ? 'Payment cancelled.' : `Payment failed: ${msg}`);
+          return;
+        }
+
+        setClaimStatus('Confirming on Base…');
+        for (let attempt = 0; attempt < 30; attempt++) {
+          await new Promise(r => setTimeout(r, 2000));
+          const rpc = await fetch('https://mainnet.base.org', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [paymentTxHash] }),
+          });
+          const { result } = await rpc.json() as { result: { status: string } | null };
+          if (result?.status === '0x1') break;
+          if (result?.status === '0x0') { setClaimError('Payment transaction failed on-chain.'); return; }
+          if (attempt === 29) { setClaimError('Payment confirmation timed out — please try again.'); return; }
+        }
+      }
+
+      // Step 2: Register
+      setClaimStatus(launchToken ? 'Registering name and launching token…' : 'Registering name…');
       const res = await fetch(`${API_BASE}/api/claim`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          subdomain: name.toLowerCase().trim(),
-          address,
-          launchTokenOnBankr: launchToken,
-          paymentToken,
-          feeRecipientType,
-          feeRecipientValue: feeRecipientType === 'wallet' ? address : feeRecipientValue.trim(),
-          tweetUrl: tweetUrl.trim() || undefined,
-          logoUrl: logoMode === 'custom' && customLogoUrl ? customLogoUrl : undefined,
+          ...baseClaimPayload,
+          paymentTxHash,
         }),
       });
       const data = await res.json();
@@ -208,6 +321,7 @@ export default function Home() {
       setClaimError('Network error. Please try again.');
     } finally {
       setClaiming(false);
+      setClaimStatus(null);
     }
   };
 
@@ -269,7 +383,10 @@ export default function Home() {
           </div>
           <TypewriterSubdomain />
           <p className="text-xl sm:text-2xl text-gray-300 max-w-2xl mx-auto">
-            Exclusive ENS subdomains for BankrClub NFT holders
+            Your name. Your token. Your fees — forever.
+          </p>
+          <p className="text-base text-gray-500 max-w-xl mx-auto">
+            BankrClub members get a free ENS subdomain + earn 57% of every trade on their personal token.
           </p>
         </div>
 
@@ -286,7 +403,7 @@ export default function Home() {
                 />
                 <div className="text-center md:text-left">
                   <h2 className="text-3xl font-bold text-white mb-2">
-                    For BankrClub NFT Holders
+                    For BankrClub NFT holders
                   </h2>
                   <p className="text-orange-400 font-semibold">1,000 founding members only</p>
                 </div>
@@ -296,7 +413,7 @@ export default function Home() {
                 <span className="font-mono text-blue-400 font-semibold">
                   yourname.bankrclub.eth
                 </span>{' '}
-                — a permanent, decentralized identity on Ethereum.
+                — your permanent web3 identity, free for BankrClub members.
               </p>
             </div>
           </div>
@@ -328,17 +445,17 @@ export default function Home() {
                     <p className="text-orange-400 font-semibold text-center">
                       🚀 Token launched on Bankr!
                     </p>
-                    {claimResult.tokenInfo.simulated && (
-                      <p className="text-yellow-400 text-sm text-center">
-                        ⚠️ Simulated — token not live yet (partner key pending)
-                      </p>
-                    )}
                     {claimResult.tokenInfo.tokenAddress && (
                       <div>
-                        <p className="text-gray-400 text-xs">Token address</p>
-                        <p className="font-mono text-white text-sm break-all">
+                        <p className="text-gray-400 text-xs mb-1">Token address</p>
+                        <a
+                          href={`https://bankr.bot/launches/${claimResult.tokenInfo.tokenAddress}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="font-mono text-orange-400 hover:text-orange-300 text-sm break-all underline transition-colors"
+                        >
                           {claimResult.tokenInfo.tokenAddress}
-                        </p>
+                        </a>
                       </div>
                     )}
                     {claimResult.tokenInfo.feeRecipient && claimResult.tokenInfo.feeRecipient.type !== 'wallet' && (
@@ -379,18 +496,71 @@ export default function Home() {
                         </div>
                       </div>
                     )}
-                    {claimResult.tokenInfo.poolId && !claimResult.tokenInfo.simulated && (
-                      <a
-                        href={`https://dexscreener.com/base/${claimResult.tokenInfo.poolId}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="block text-center bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 px-4 rounded-lg transition-colors"
-                      >
-                        View on Dexscreener →
-                      </a>
+                    {claimResult.tokenInfo.tokenAddress && !claimResult.tokenInfo.simulated && (
+                      <div className="flex flex-col sm:flex-row gap-2 pt-1">
+                        <a
+                          href={`https://bankr.bot/launches/${claimResult.tokenInfo.tokenAddress}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="flex-1 block text-center bg-orange-600 hover:bg-orange-500 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                        >
+                          View on Bankr →
+                        </a>
+                        {claimResult.tokenInfo.poolId && (
+                          <a
+                            href={`https://dexscreener.com/base/${claimResult.tokenInfo.poolId}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="flex-1 block text-center bg-gray-700 hover:bg-gray-600 text-white font-bold py-2 px-4 rounded-lg transition-colors"
+                          >
+                            Dexscreener →
+                          </a>
+                        )}
+                      </div>
                     )}
                   </div>
                 )}
+                <div className="bg-gray-800/50 rounded-xl p-4 border border-gray-700 text-left space-y-3">
+                  <p className="text-gray-400 text-xs font-semibold uppercase tracking-wide">How to use your ENS</p>
+                  <div className="space-y-2 text-sm">
+                    <div className="flex items-start gap-2">
+                      <span>🔍</span>
+                      <span className="text-gray-300">
+                        Look it up on{' '}
+                        <a href={`https://app.ens.domains/${claimResult.ens}`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline">app.ens.domains</a>
+                        {' '}— resolves via CCIP-Read
+                      </span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span>💳</span>
+                      <span className="text-gray-300">Use <span className="font-mono text-blue-400">{claimResult.ens}</span> as your username in Rainbow, MetaMask, or any ENS-aware app — send ETH to it like an address</span>
+                    </div>
+                    <div className="flex items-start gap-2">
+                      <span>🌐</span>
+                      <span className="text-gray-300">
+                        Your profile page:{' '}
+                        <a href={`https://${claimResult.ens}.limo`} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:text-blue-300 underline font-mono">{claimResult.ens}.limo</a>
+                      </span>
+                    </div>
+                    {claimResult.tokenInfo && !claimResult.tokenInfo.error && (
+                      <div className="flex items-start gap-2">
+                        <span>📈</span>
+                        <span className="text-gray-300">
+                          Track{' '}
+                          <a
+                            href={claimResult.tokenInfo.tokenAddress
+                              ? `https://bankr.bot/launches/${claimResult.tokenInfo.tokenAddress}`
+                              : 'https://bankr.bot'}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-orange-400 hover:text-orange-300"
+                          >your token on Bankr</a>
+                          {' '}— fees land in your wallet automatically
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <a
                   href={`https://${claimResult.ens}.limo`}
                   target="_blank"
@@ -409,12 +579,12 @@ export default function Home() {
               <div className="grid md:grid-cols-3 gap-6 p-8">
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
                   <div className="text-3xl mb-3">🆓</div>
-                  <h3 className="text-lg font-bold text-white mb-2">Free Names</h3>
-                  <p className="text-gray-400 text-sm">9+ characters, yours forever</p>
+                  <h3 className="text-lg font-bold text-white mb-2">Free names</h3>
+                  <p className="text-gray-400 text-sm">9+ characters — permanent, no gas</p>
                 </div>
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
                   <div className="text-3xl mb-3">⭐</div>
-                  <h3 className="text-lg font-bold text-white mb-2">Premium Names</h3>
+                  <h3 className="text-lg font-bold text-white mb-2">Premium names</h3>
                   <p className="text-gray-400 text-sm">
                     3–8 chars from 0.002 ETH<br />
                     <span className="text-orange-400">10% off with $BNKR · 25% off with $CLAWDIA</span>
@@ -422,12 +592,25 @@ export default function Home() {
                 </div>
                 <div className="bg-gray-800/50 rounded-xl p-6 border border-gray-700">
                   <div className="text-3xl mb-3">🪙</div>
-                  <h3 className="text-lg font-bold text-white mb-2">Launch Your Token</h3>
-                  <p className="text-gray-400 text-sm">57% of trading fees go to you</p>
+                  <h3 className="text-lg font-bold text-white mb-2">Launch your token</h3>
+                  <p className="text-gray-400 text-sm">57% of every trade's fees — yours automatically, forever</p>
                 </div>
               </div>
-              <div className="p-8 pt-0 flex justify-center">
-                <ConnectButton label="Connect Wallet to Claim" />
+              <div className="p-8 pt-0 space-y-4">
+                <div className="flex justify-center">
+                  <ConnectButton label="Connect wallet to claim" />
+                </div>
+                <p className="text-center text-gray-600 text-xs">
+                  🤖 AI agent?{' '}
+                  <a
+                    href="https://github.com/ClawdiaETH/bankrclub-ens#agent-api"
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-gray-500 hover:text-gray-300 underline transition-colors"
+                  >
+                    Register via REST API →
+                  </a>
+                </p>
               </div>
             </>
           )}
@@ -436,7 +619,7 @@ export default function Home() {
           {isConnected && !isHolder && !claimResult && (
             <div className="p-8 text-center space-y-6">
               <div className="text-5xl">🔒</div>
-              <h3 className="text-2xl font-bold text-white">BankrClub NFT Required</h3>
+              <h3 className="text-2xl font-bold text-white">BankrClub NFT required</h3>
               <p className="text-gray-400 max-w-md mx-auto">
                 You need to hold a BankrClub NFT to claim a{' '}
                 <span className="font-mono text-blue-400">yourname.bankrclub.eth</span> subdomain.
@@ -464,7 +647,7 @@ export default function Home() {
           {isConnected && isHolder && !claimResult && (
             <div className="p-8 space-y-6">
               <div className="flex items-center justify-between mb-2">
-                <h3 className="text-xl font-bold text-white">Claim Your Subdomain</h3>
+                <h3 className="text-xl font-bold text-white">Claim your subdomain</h3>
                 <ConnectButton />
               </div>
               <div className="bg-green-900/30 border border-green-700 rounded-xl p-4 text-sm text-green-400">
@@ -473,7 +656,57 @@ export default function Home() {
 
               {/* ── Name input ── */}
               <div>
-                <label className="block text-gray-400 text-sm mb-2">Choose your name</label>
+                <div className="flex items-center justify-between mb-2">
+                  <label className="text-gray-400 text-sm">Choose your name</label>
+                  <div className="relative" ref={pricingRef}>
+                    <button
+                      type="button"
+                      onClick={() => setShowPricing(p => !p)}
+                      className="text-gray-500 text-xs cursor-pointer hover:text-gray-300 transition-colors select-none"
+                    >
+                      Pricing {showPricing ? '▴' : '▾'}
+                    </button>
+                    {showPricing && (
+                      <div className="absolute right-0 top-7 z-20 bg-gray-900 border border-gray-700 rounded-2xl p-5 shadow-2xl w-80 text-sm">
+                        <p className="text-white font-semibold mb-3">Name pricing</p>
+                        <div className="grid grid-cols-3 gap-x-4 gap-y-2 mb-4">
+                          <span className="text-gray-500 text-xs uppercase tracking-wide">Length</span>
+                          <span className="text-gray-500 text-xs uppercase tracking-wide">ETH</span>
+                          <span className="text-gray-500 text-xs uppercase tracking-wide">Best price</span>
+                          {[
+                            ['3 chars', '0.05',  '0.0375'],
+                            ['4 chars', '0.02',  '0.015'],
+                            ['5 chars', '0.01',  '0.0075'],
+                            ['6 chars', '0.005', '0.00375'],
+                            ['7 chars', '0.003', '0.00225'],
+                            ['8 chars', '0.002', '0.0015'],
+                          ].map(([len, price, best]) => (
+                            <Fragment key={len}>
+                              <span className="text-gray-300">{len}</span>
+                              <span className="text-white font-mono">{price}</span>
+                              <span className="text-purple-400 font-mono">{best}</span>
+                            </Fragment>
+                          ))}
+                          <span className="text-green-400 font-semibold">9+ chars</span>
+                          <span className="text-green-400 font-semibold font-mono col-span-2">Free!</span>
+                        </div>
+                        <div className="pt-3 border-t border-gray-700 space-y-2">
+                          <p className="text-gray-400 text-xs">Hold tokens to unlock discounts:</p>
+                          <div className="flex items-center justify-between">
+                            <span className="text-orange-400 font-semibold">$BNKR</span>
+                            <span className="text-gray-400 text-xs">10% off</span>
+                            <a href="https://app.uniswap.org/swap?outputCurrency=0x22aF33FE49fD1Fa80c7149773dDe5890D3c76F3b&chain=base" target="_blank" rel="noopener noreferrer" className="text-orange-400 hover:text-orange-300 text-xs underline">Buy →</a>
+                          </div>
+                          <div className="flex items-center justify-between">
+                            <span className="text-purple-400 font-semibold">$CLAWDIA</span>
+                            <span className="text-gray-400 text-xs">25% off</span>
+                            <a href="https://app.uniswap.org/swap?outputCurrency=0xbbd9aDe16525acb4B336b6dAd3b9762901522B07&chain=base" target="_blank" rel="noopener noreferrer" className="text-purple-400 hover:text-purple-300 text-xs underline">Buy →</a>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
                 <div className="flex items-center gap-3">
                   <div className="relative flex-1">
                     <input
@@ -523,6 +756,8 @@ export default function Home() {
                   hasClawdia={tokenBalances?.hasClawdia ?? false}
                   selected={paymentToken}
                   onChange={setPaymentToken}
+                  tokenAmount={tokenAmount}
+                  tokenPriceFetching={tokenPriceFetching}
                 />
               )}
 
@@ -537,7 +772,10 @@ export default function Home() {
                   <div>
                     <p className="text-white font-semibold">🚀 Launch my token on Bankr</p>
                     <p className="text-gray-400 text-sm mt-1">
-                      57% of trading fees go directly to you. Token named after your ENS.
+                      {name
+                        ? <>57% of trading fees go to you. Deploys as <span className="text-white font-semibold font-mono">${name.toUpperCase().slice(0, 10)}</span> on Base.</>
+                        : '57% of trading fees go directly to you. Enter your name to see your token symbol.'
+                      }
                     </p>
                   </div>
                   <div className={`w-12 h-6 rounded-full transition-colors flex items-center shrink-0 ml-4 ${
@@ -711,7 +949,8 @@ export default function Home() {
               >
                 {claiming ? (
                   <span className="flex items-center justify-center gap-2">
-                    <span className="animate-spin">⚙️</span> Claiming...
+                    <span className="animate-spin">⚙️</span>
+                    {claimStatus || 'Claiming…'}
                   </span>
                 ) : (
                   `Claim ${name ? `${name}.bankrclub.eth` : 'your name'}`
@@ -719,7 +958,15 @@ export default function Home() {
               </button>
 
               <p className="text-gray-500 text-xs text-center">
-                One name per wallet. Registration is permanent and offchain (gas-free).
+                One name per wallet. Permanent registration
+                {availability?.isPremium
+                  ? paymentToken === 'ETH'
+                    ? ` — ${displayPrice} ETH payment on Base.`
+                    : tokenAmount != null
+                      ? ` — ~${tokenAmount.toFixed(2)} $${paymentToken} payment on Base.`
+                      : ` — ${displayPrice} ETH equiv in $${paymentToken} on Base.`
+                  : ' — no gas fees.'
+                }
               </p>
             </div>
           )}
@@ -767,7 +1014,7 @@ export default function Home() {
             ⚡ Zero gas fees • 🚀 Instant registration • ✅ Verified ownership
           </p>
           <p className="text-gray-500 text-xs font-mono">
-            Powered by CCIP-Read (EIP-3668) • Launching Feb 24th, 2026
+            Powered by CCIP-Read (EIP-3668) • Live on Base
           </p>
         </div>
       </div>
