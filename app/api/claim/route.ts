@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkAvailability, createRegistration, getRegistrationByAddress, isPaymentTxUsed, markPaymentTxUsed } from '@/lib/db';
+import { checkAvailability, createPremiumRegistration, createRegistration, RegistrationConflictError } from '@/lib/db';
 import { getTokenPriceInEth, calcTokenAmount, toTokenWei, BNKR_ADDRESS, CLAWDIA_ADDRESS, TRANSFER_TOPIC } from '@/lib/tokenPrice';
 import { verifyBankrClubHolder } from '@/lib/nftVerify';
 import { FeeRecipientType } from '@/lib/bankrApi';
@@ -100,20 +100,6 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'BankrClub NFT required' }, { status: 403, headers: corsHeaders });
   }
 
-  // Enforce one-per-wallet restriction
-  try {
-    const existingRegistration = await getRegistrationByAddress(address);
-    if (existingRegistration) {
-      return NextResponse.json(
-        { error: 'one name per wallet - you already have a registration' },
-        { status: 409, headers: corsHeaders }
-      );
-    }
-  } catch (e) {
-    console.error('Wallet check failed:', e);
-    return NextResponse.json({ error: 'wallet check failed' }, { status: 500, headers: corsHeaders });
-  }
-
   // Check availability
   try {
     const available = await checkAvailability(name);
@@ -139,11 +125,6 @@ export async function POST(req: NextRequest) {
         { error: `premium name — payment required`, code: 'PAYMENT_REQUIRED', price: discountedPrice, token },
         { status: 402, headers: corsHeaders }
       );
-    }
-
-    const alreadyUsed = await isPaymentTxUsed(paymentTxHash);
-    if (alreadyUsed) {
-      return NextResponse.json({ error: 'payment tx already used for another registration' }, { status: 400, headers: corsHeaders });
     }
 
     // Get tx receipt (works only post-confirmation)
@@ -212,22 +193,45 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    await markPaymentTxUsed(paymentTxHash, address, name);
     console.log(`Premium claim: ${name} | token=${token} | price=${discountedPrice} ETH equiv | tx=${paymentTxHash}`);
   }
 
   // Register
   let registration: Record<string, unknown>;
   try {
-    registration = await createRegistration({
-      subdomain: name,
-      address,
-      tokenId,
-      isPremium,
-      paymentToken: token,
-      premiumPaidEth: isPremium ? discountedPrice : undefined,
-    });
+    if (isPremium) {
+      registration = await createPremiumRegistration({
+        subdomain: name,
+        address,
+        tokenId,
+        isPremium,
+        paymentToken: token,
+        premiumPaidEth: discountedPrice,
+        paymentTxHash: paymentTxHash as string,
+      });
+    } else {
+      registration = await createRegistration({
+        subdomain: name,
+        address,
+        tokenId,
+        isPremium,
+        paymentToken: token,
+        premiumPaidEth: undefined,
+      });
+    }
   } catch (e) {
+    if (e instanceof RegistrationConflictError) {
+      if (e.reason === 'PAYMENT_TX_USED') {
+        return NextResponse.json({ error: 'payment tx already used for another registration' }, { status: 400, headers: corsHeaders });
+      }
+      return NextResponse.json(
+        { error: 'one name per wallet - you already have a registration' },
+        { status: 409, headers: corsHeaders }
+      );
+    }
+    if (typeof e === 'object' && e !== null && 'code' in e && (e as { code?: string }).code === '23505') {
+      return NextResponse.json({ error: 'name already taken' }, { status: 409, headers: corsHeaders });
+    }
     console.error('Registration failed:', e);
     return NextResponse.json({ error: 'registration failed' }, { status: 500, headers: corsHeaders });
   }

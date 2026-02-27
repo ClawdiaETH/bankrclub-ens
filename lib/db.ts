@@ -7,6 +7,18 @@ function getDb() {
   return neon(url);
 }
 
+export type RegistrationConflictReason = 'ADDRESS_TAKEN' | 'PAYMENT_TX_USED';
+
+export class RegistrationConflictError extends Error {
+  reason: RegistrationConflictReason;
+
+  constructor(reason: RegistrationConflictReason) {
+    super(reason);
+    this.name = 'RegistrationConflictError';
+    this.reason = reason;
+  }
+}
+
 export async function checkAvailability(subdomain: string): Promise<boolean> {
   const sql = getDb();
   const rows = await sql`SELECT id FROM registrations WHERE subdomain = ${subdomain}`;
@@ -35,18 +47,90 @@ export async function createRegistration(data: {
 }) {
   const sql = getDb();
   const rows = await sql`
-    INSERT INTO registrations (subdomain, address, token_id, is_premium, payment_token, premium_paid_eth)
-    VALUES (
-      ${data.subdomain},
-      ${data.address},
-      ${data.tokenId ?? null},
-      ${data.isPremium || false},
-      ${data.paymentToken || 'ETH'},
-      ${data.premiumPaidEth || null}
+    WITH wallet_lock AS (
+      SELECT pg_advisory_xact_lock(hashtext(lower(${data.address}::text)))
+    ),
+    inserted AS (
+      INSERT INTO registrations (subdomain, address, token_id, is_premium, payment_token, premium_paid_eth)
+      SELECT
+        ${data.subdomain},
+        ${data.address},
+        ${data.tokenId ?? null},
+        ${data.isPremium || false},
+        ${data.paymentToken || 'ETH'},
+        ${data.premiumPaidEth ?? null}
+      FROM wallet_lock
+      WHERE NOT EXISTS (
+        SELECT 1 FROM registrations WHERE LOWER(address) = LOWER(${data.address})
+      )
+      RETURNING *
     )
-    RETURNING *
+    SELECT * FROM inserted
   `;
+  if (rows.length === 0) {
+    throw new RegistrationConflictError('ADDRESS_TAKEN');
+  }
   return rows[0];
+}
+
+export async function createPremiumRegistration(data: {
+  subdomain: string;
+  address: string;
+  tokenId?: number;
+  isPremium?: boolean;
+  paymentToken?: string;
+  premiumPaidEth?: number;
+  paymentTxHash: string;
+}) {
+  const sql = getDb();
+  const txHash = data.paymentTxHash.toLowerCase();
+  const rows = await sql`
+    WITH wallet_lock AS (
+      SELECT pg_advisory_xact_lock(hashtext(lower(${data.address}::text)))
+    ),
+    wallet_free AS (
+      SELECT 1 AS ok
+      FROM wallet_lock
+      WHERE NOT EXISTS (
+        SELECT 1 FROM registrations WHERE LOWER(address) = LOWER(${data.address})
+      )
+    ),
+    tx_insert AS (
+      INSERT INTO payment_txhashes (tx_hash, address, name, created_at)
+      SELECT ${txHash}, ${data.address.toLowerCase()}, ${data.subdomain}, NOW()
+      FROM wallet_free
+      ON CONFLICT (tx_hash) DO NOTHING
+      RETURNING tx_hash
+    ),
+    registration_insert AS (
+      INSERT INTO registrations (subdomain, address, token_id, is_premium, payment_token, premium_paid_eth)
+      SELECT
+        ${data.subdomain},
+        ${data.address},
+        ${data.tokenId ?? null},
+        ${data.isPremium || false},
+        ${data.paymentToken || 'ETH'},
+        ${data.premiumPaidEth ?? null}
+      FROM tx_insert
+      RETURNING *
+    )
+    SELECT
+      CASE
+        WHEN (SELECT COUNT(*) FROM wallet_free) = 0 THEN 'ADDRESS_TAKEN'
+        WHEN (SELECT COUNT(*) FROM tx_insert) = 0 THEN 'PAYMENT_TX_USED'
+        ELSE 'OK'
+      END AS outcome,
+      (SELECT row_to_json(registration_insert) FROM registration_insert LIMIT 1) AS registration
+  `;
+
+  const result = rows[0] as { outcome: 'OK' | RegistrationConflictReason; registration: Record<string, unknown> | null } | undefined;
+  if (!result || result.outcome !== 'OK' || !result.registration) {
+    const reason: RegistrationConflictReason =
+      result?.outcome === 'PAYMENT_TX_USED' ? 'PAYMENT_TX_USED' : 'ADDRESS_TAKEN';
+    throw new RegistrationConflictError(reason);
+  }
+
+  return result.registration;
 }
 
 export async function updateTokenInfo(

@@ -1,3 +1,5 @@
+import { parseUnits } from 'viem';
+
 /**
  * Fetch token price in ETH from DexScreener (Base chain).
  * Returns price of 1 token in ETH (priceNative).
@@ -34,5 +36,12 @@ export function calcTokenAmount(ethAmount: number, tokenPriceInEth: number): num
 
 /** Convert token amount to bigint with 18 decimals */
 export function toTokenWei(tokenAmount: number): bigint {
-  return BigInt(Math.round(tokenAmount * 10 ** TOKEN_DECIMALS));
+  if (!Number.isFinite(tokenAmount) || tokenAmount < 0) {
+    throw new Error('Invalid token amount');
+  }
+  const normalized = tokenAmount.toLocaleString('en-US', {
+    useGrouping: false,
+    maximumFractionDigits: TOKEN_DECIMALS,
+  });
+  return parseUnits(normalized, TOKEN_DECIMALS);
 }
