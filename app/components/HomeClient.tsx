@@ -225,8 +225,31 @@ export default function Home() {
     let paymentTxHash: string | undefined;
 
     try {
+      const baseClaimPayload = {
+        subdomain: name.toLowerCase().trim(),
+        address,
+        launchTokenOnBankr: launchToken,
+        paymentToken,
+        feeRecipientType,
+        feeRecipientValue: feeRecipientType === 'wallet' ? address : feeRecipientValue.trim(),
+        tweetUrl: tweetUrl.trim() || undefined,
+        logoUrl: logoMode === 'custom' && customLogoUrl ? customLogoUrl : undefined,
+      };
+
       // Step 1: Send payment for premium names (ETH or ERC20 token)
       if (availability.isPremium && displayPrice) {
+        setClaimStatus('Checking eligibility…');
+        const preflightRes = await fetch(`${API_BASE}/api/claim`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(baseClaimPayload),
+        });
+        const preflightData = await preflightRes.json();
+        if (preflightRes.status !== 402 || preflightData.code !== 'PAYMENT_REQUIRED') {
+          setClaimError(preflightData.error || 'Claim failed');
+          return;
+        }
+
         const TREASURY = '0xf17b5dD382B048Ff4c05c1C9e4E24cfC5C6adAd9';
         const ERC20_ABI = [{
           name: 'transfer', type: 'function' as const,
@@ -284,15 +307,8 @@ export default function Home() {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          subdomain: name.toLowerCase().trim(),
-          address,
-          launchTokenOnBankr: launchToken,
-          paymentToken,
+          ...baseClaimPayload,
           paymentTxHash,
-          feeRecipientType,
-          feeRecipientValue: feeRecipientType === 'wallet' ? address : feeRecipientValue.trim(),
-          tweetUrl: tweetUrl.trim() || undefined,
-          logoUrl: logoMode === 'custom' && customLogoUrl ? customLogoUrl : undefined,
         }),
       });
       const data = await res.json();

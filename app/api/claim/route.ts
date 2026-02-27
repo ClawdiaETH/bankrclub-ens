@@ -1,5 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { checkAvailability, createPremiumRegistration, createRegistration, RegistrationConflictError } from '@/lib/db';
+import {
+  checkAvailability,
+  createPremiumRegistration,
+  createRegistration,
+  getRegistrationByAddress,
+  RegistrationConflictError,
+} from '@/lib/db';
 import { getTokenPriceInEth, calcTokenAmount, toTokenWei, BNKR_ADDRESS, CLAWDIA_ADDRESS, TRANSFER_TOPIC } from '@/lib/tokenPrice';
 import { verifyBankrClubHolder } from '@/lib/nftVerify';
 import { FeeRecipientType } from '@/lib/bankrApi';
@@ -98,6 +104,20 @@ export async function POST(req: NextRequest) {
   const { isHolder, tokenId } = await verifyBankrClubHolder(address);
   if (!isHolder) {
     return NextResponse.json({ error: 'BankrClub NFT required' }, { status: 403, headers: corsHeaders });
+  }
+
+  // Enforce one-per-wallet restriction before premium payment verification
+  try {
+    const existingRegistration = await getRegistrationByAddress(address);
+    if (existingRegistration) {
+      return NextResponse.json(
+        { error: 'one name per wallet - you already have a registration' },
+        { status: 409, headers: corsHeaders }
+      );
+    }
+  } catch (e) {
+    console.error('Wallet check failed:', e);
+    return NextResponse.json({ error: 'wallet check failed' }, { status: 500, headers: corsHeaders });
   }
 
   // Check availability
