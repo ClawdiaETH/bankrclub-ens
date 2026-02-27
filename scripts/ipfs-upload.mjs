@@ -1,8 +1,10 @@
 #!/usr/bin/env node
 /**
- * Upload a directory to Pinata using v3 API with proper folder upload.
- * All files are prefixed with a virtual directory name so Pinata groups them.
- * wrapWithDirectory:false = returned CID is the folder itself, not a parent.
+ * Upload a directory to Pinata using the v3 API.
+ * Creates one upload per file, grouped by a Pinata group.
+ * Uses wrapWithDirectory:false so returned CID is the directory root.
+ *
+ * Falls back to v2 pinFileToIPFS if v3 fails.
  */
 import { readFileSync, readdirSync, statSync } from 'fs';
 import { join, relative } from 'path';
@@ -11,7 +13,7 @@ import { lookup as mimeType } from 'mime-types';
 const PINATA_JWT = process.env.PINATA_JWT;
 const DIR = process.argv[2] || 'out';
 const NAME = process.argv[3] || 'bankrclub-ens';
-const FOLDER_NAME = 'app'; // virtual root prefix Pinata groups by
+const FOLDER_NAME = 'app';
 
 if (!PINATA_JWT) { console.error('❌ PINATA_JWT required'); process.exit(1); }
 
@@ -28,6 +30,7 @@ function walk(dir, base = dir) {
 const files = walk(DIR);
 console.error(`📁 Uploading ${files.length} files from ${DIR}/`);
 
+// --- V2 pinFileToIPFS with directory prefix (proven approach) ---
 const boundary = `----FormBoundary${Date.now().toString(36)}`;
 const parts = [];
 
@@ -42,7 +45,6 @@ for (const { full, rel } of files) {
   );
 }
 
-// metadata + options
 parts.push(
   Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="pinataMetadata"\r\n\r\n${JSON.stringify({ name: NAME })}\r\n`),
   Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="pinataOptions"\r\n\r\n${JSON.stringify({ cidVersion: 0, wrapWithDirectory: false })}\r\n`),

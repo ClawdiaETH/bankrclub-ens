@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { getDb } from '@/lib/db';
+import { neon } from '@neondatabase/serverless';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,7 +11,9 @@ export async function GET() {
 
   // DB connectivity
   try {
-    const sql = getDb();
+    const url = process.env.POSTGRES_URL;
+    if (!url) throw new Error('POSTGRES_URL not set');
+    const sql = neon(url);
     const result = await sql`SELECT COUNT(*) AS count FROM registrations`;
     checks.db = `ok (${result[0].count} registrations)`;
   } catch (e) {
