@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { checkAvailability } from '@/lib/db';
+
+export const runtime = 'edge'; // No cold start — instant response for name availability
 import {
   getDiscountedPremiumPrice,
   getPremiumPrice,

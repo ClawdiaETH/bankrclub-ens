@@ -1,0 +1,46 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master, post-bugbot]
+
+jobs:
+  typecheck-and-build:
+    name: Typecheck & build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: TypeScript check
+        run: npx tsc --noEmit
+
+      - name: Build (Vercel mode)
+        run: npm run build
+        env:
+          # Stub env vars so the build doesn't fail on missing secrets
+          POSTGRES_URL: postgresql://stub:stub@stub/stub
+          BANKR_PARTNER_KEY: pending
+          NEYNAR_API_KEY: stub
+          FARCASTER_SIGNER_UUID: stub
+          RECEIPT_SECRET: stub
+          SIGNING_KEY: '0x0000000000000000000000000000000000000000000000000000000000000001'
+
+      - name: Build (IPFS export mode)
+        run: bash -c "mv app/api ../api-bak && NEXT_PUBLIC_IPFS_BUILD=true NEXT_PUBLIC_API_URL=https://bankrclub-ens.vercel.app NODE_OPTIONS='--require ./lib/polyfill-localstorage.cjs' npm run build; mv ../api-bak app/api"
+        env:
+          POSTGRES_URL: postgresql://stub:stub@stub/stub
+          BANKR_PARTNER_KEY: pending
+          NEYNAR_API_KEY: stub
+          FARCASTER_SIGNER_UUID: stub
+          RECEIPT_SECRET: stub
+          SIGNING_KEY: '0x0000000000000000000000000000000000000000000000000000000000000001'
