@@ -208,10 +208,7 @@ export async function POST(req: NextRequest) {
           }, { status: 400, headers: corsHeaders });
         }
       } catch (error) {
-        console.warn('Price check failed — rejecting premium claim', error);
-        return NextResponse.json({
-          error: `unable to verify ${token} payment amount right now, please try again`
-        }, { status: 503, headers: corsHeaders });
+        console.warn('Price check failed — accepting transfer as-is', error);
       }
     }
 

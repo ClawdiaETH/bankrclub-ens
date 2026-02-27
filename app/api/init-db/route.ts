@@ -37,5 +37,9 @@ export async function GET() {
   )`;
   await sql`ALTER TABLE payment_txhashes ADD COLUMN IF NOT EXISTS claimer TEXT`;
   await sql`ALTER TABLE payment_txhashes ADD COLUMN IF NOT EXISTS subdomain TEXT`;
+  await sql`UPDATE payment_txhashes SET claimer = '' WHERE claimer IS NULL`;
+  await sql`UPDATE payment_txhashes SET subdomain = '' WHERE subdomain IS NULL`;
+  await sql`ALTER TABLE payment_txhashes ALTER COLUMN claimer SET NOT NULL`;
+  await sql`ALTER TABLE payment_txhashes ALTER COLUMN subdomain SET NOT NULL`;
   return NextResponse.json({ ok: true, message: 'DB initialized' });
 }
