@@ -7,7 +7,8 @@
  *
  * Outputs the CIDv0 to stdout on success.
  */
-import { S3Client, CreateBucketCommand, PutObjectCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { S3Client, CreateBucketCommand, HeadObjectCommand } from '@aws-sdk/client-s3';
+import { Upload } from '@aws-sdk/lib-storage';
 import { execSync } from 'child_process';
 import { readFileSync } from 'fs';
 import { join } from 'path';
@@ -48,15 +49,19 @@ try {
   }
 }
 
-// Upload CAR
+// Upload CAR (multipart-aware for large files)
 const carData = readFileSync(carPath);
-await s3.send(new PutObjectCommand({
-  Bucket: BUCKET,
-  Key: KEY,
-  Body: carData,
-  ContentType: 'application/vnd.ipld.car',
-  Metadata: { name: NAME },
-}));
+const upload = new Upload({
+  client: s3,
+  params: {
+    Bucket: BUCKET,
+    Key: KEY,
+    Body: carData,
+    ContentType: 'application/vnd.ipld.car',
+    Metadata: { name: NAME },
+  },
+});
+await upload.done();
 
 // Poll for CID (Filebase pins async — usually instant)
 let cid = null;
