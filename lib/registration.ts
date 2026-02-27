@@ -11,7 +11,7 @@ export const LAUNCH_ERROR_MESSAGES: Record<string, string> = {
 
 const RESERVED = [
   'bankr', 'admin', 'www', 'api', 'app', 'mail',
-  'help', 'support', 'team', 'clawdia',
+  'help', 'support', 'team',
 ];
 
 export function validateName(name: string): { valid: boolean; reason?: string } {
