@@ -16,10 +16,23 @@ fi
 
 echo "🔨 Building static export..."
 rm -rf .next out
+
+# Temporarily hide API routes — they live on Vercel, not IPFS.
+# Next.js 15 output:export fails if API routes exist without force-static.
+mv app/api app/api-bak
+
+cleanup() {
+  mv app/api-bak app/api 2>/dev/null || true
+}
+trap cleanup EXIT
+
 NEXT_PUBLIC_IPFS_BUILD=true \
   NEXT_PUBLIC_API_URL="${NEXT_PUBLIC_API_URL:-https://bankrclub-ens.vercel.app}" \
   NODE_OPTIONS="--require ./lib/polyfill-localstorage.cjs" \
   npm run build
+
+mv app/api-bak app/api
+trap - EXIT
 
 echo "📦 Uploading to Pinata..."
 # wrapWithDirectory:false = CID points directly to the app files (no extra subfolder level)
