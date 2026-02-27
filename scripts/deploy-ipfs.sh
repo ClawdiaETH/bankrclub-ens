@@ -17,12 +17,12 @@ fi
 echo "🔨 Building static export..."
 rm -rf .next out
 
-# Temporarily hide API routes — they live on Vercel, not IPFS.
-# Next.js 15 output:export fails if API routes exist without force-static.
-mv app/api app/api-bak
+# Temporarily move API routes outside app/ — they live on Vercel, not IPFS.
+# Next.js 15 output:export fails on any dynamic route handler inside app/.
+mv app/api ../api-ipfs-bak
 
 cleanup() {
-  mv app/api-bak app/api 2>/dev/null || true
+  mv ../api-ipfs-bak app/api 2>/dev/null || true
 }
 trap cleanup EXIT
 
@@ -31,7 +31,7 @@ NEXT_PUBLIC_IPFS_BUILD=true \
   NODE_OPTIONS="--require ./lib/polyfill-localstorage.cjs" \
   npm run build
 
-mv app/api-bak app/api
+mv ../api-ipfs-bak app/api
 trap - EXIT
 
 echo "📦 Uploading to Pinata..."
