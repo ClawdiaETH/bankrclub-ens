@@ -196,11 +196,12 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({ error: `no ${token} Transfer to treasury found in tx` }, { status: 400, headers: corsHeaders });
       }
 
-      // Verify amount — fetch current price, allow 20% slippage tolerance
+      // Verify amount — fetch current price, allow 40% slippage tolerance
+      // (low-liquidity tokens have volatile oracle prices)
       try {
         const tokenPriceInEth = await getTokenPriceInEth(tokenAddress);
         const requiredTokens = calcTokenAmount(discountedPrice, tokenPriceInEth);
-        const minAccepted = toTokenWei(requiredTokens * 0.80); // 20% slippage tolerance
+        const minAccepted = toTokenWei(requiredTokens * 0.60); // 40% slippage tolerance
         const paidTokenWei = BigInt(transferLog.data);
         if (paidTokenWei < minAccepted) {
           return NextResponse.json({
@@ -208,10 +209,9 @@ export async function POST(req: NextRequest) {
           }, { status: 400, headers: corsHeaders });
         }
       } catch (error) {
-        console.warn('Price check failed — rejecting premium claim', error);
-        return NextResponse.json({
-          error: `unable to verify ${token} payment amount right now, please try again`
-        }, { status: 503, headers: corsHeaders });
+        // DexScreener unavailable — Transfer event is confirmed on-chain so accept it.
+        // Log for manual audit; do NOT block the user who already paid.
+        console.warn(`Price check skipped for ${token} — DexScreener unavailable. tx=${paymentTxHash}`, error);
       }
     }
 
