@@ -10,6 +10,7 @@ import { getTokenPriceInEth, calcTokenAmount, toTokenWei, BNKR_ADDRESS, CLAWDIA_
 import { verifyBankrClubHolder } from '@/lib/nftVerify';
 import { FeeRecipientType } from '@/lib/bankrApi';
 import { announceRegistration } from '@/lib/neynar';
+import { createSubnodeOnchain } from '@/lib/ensSubdomain';
 import { launchClaimToken } from '@/lib/tokenLaunch';
 import {
   PaymentToken,
@@ -259,6 +260,11 @@ export async function POST(req: NextRequest) {
 
   // Fire-and-forget Neynar announcement (non-blocking)
   announceRegistration(name, address, false).catch(() => {});
+
+  // Fire-and-forget on-chain ENS subdomain — makes name visible in app.ens.domains
+  createSubnodeOnchain(name, address).catch((e) =>
+    console.error(`ENS on-chain subdomain failed for ${name}:`, e)
+  );
 
   // Optional: launch token on Bankr
   let tokenInfo = null;
