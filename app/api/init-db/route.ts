@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { neon } from '@neondatabase/serverless';
 
-export const dynamic = 'force-dynamic';
+export const dynamic = process.env.NEXT_PUBLIC_IPFS_BUILD === 'true' ? 'auto' : 'force-dynamic';
 
 export async function GET() {
   if (process.env.NODE_ENV === 'production' && !process.env.ALLOW_DB_INIT) {

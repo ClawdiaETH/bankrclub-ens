@@ -3,7 +3,7 @@ import { getRegistration } from '@/lib/db';
 import { encodeResult, signResponse, parseSubdomainFromCalldata } from '@/lib/ensResolver';
 import { ethers } from 'ethers';
 
-export const dynamic = 'force-dynamic';
+export const dynamic = process.env.NEXT_PUBLIC_IPFS_BUILD === 'true' ? 'auto' : 'force-dynamic';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
