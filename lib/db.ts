@@ -96,7 +96,7 @@ export async function createPremiumRegistration(data: {
       )
     ),
     tx_insert AS (
-      INSERT INTO payment_txhashes (tx_hash, claimer, subdomain, created_at)
+      INSERT INTO payment_txhashes (tx_hash, address, name, created_at)
       SELECT ${txHash}, ${data.address.toLowerCase()}, ${data.subdomain}, NOW()
       FROM wallet_free
       ON CONFLICT (tx_hash) DO NOTHING

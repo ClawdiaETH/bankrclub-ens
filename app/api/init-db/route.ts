@@ -30,11 +30,9 @@ export async function GET() {
   )`;
   await sql`CREATE TABLE IF NOT EXISTS payment_txhashes (
     tx_hash TEXT PRIMARY KEY,
-    claimer TEXT NOT NULL,
-    subdomain TEXT NOT NULL,
+    address TEXT NOT NULL,
+    name TEXT NOT NULL,
     created_at TIMESTAMPTZ DEFAULT NOW()
   )`;
-  await sql`ALTER TABLE payment_txhashes ADD COLUMN IF NOT EXISTS claimer TEXT`;
-  await sql`ALTER TABLE payment_txhashes ADD COLUMN IF NOT EXISTS subdomain TEXT`;
   return NextResponse.json({ ok: true, message: 'DB initialized' });
 }
