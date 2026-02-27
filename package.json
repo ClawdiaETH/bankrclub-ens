@@ -23,6 +23,7 @@
     "wagmi": "^2.13.5"
   },
   "devDependencies": {
+    "@aws-sdk/client-s3": "^3.999.0",
     "@ensdomains/content-hash": "^3.0.0",
     "@types/node": "^22",
     "@types/react": "^19",
@@ -31,6 +32,7 @@
     "eslint": "^9",
     "eslint-config-next": "^15.1.4",
     "form-data": "^4.0.5",
+    "ipfs-car": "^3.1.0",
     "pg": "^8.18.0",
     "pinata": "^2.5.5",
     "postcss": "^8",

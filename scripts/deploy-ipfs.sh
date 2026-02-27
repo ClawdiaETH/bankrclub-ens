@@ -1,11 +1,12 @@
 #!/bin/bash
 set -e
 
-PINATA_JWT=$(~/clawd/scripts/get-secret.sh pinata_jwt 2>/dev/null)
+FILEBASE_ACCESS_KEY=$(~/clawd/scripts/get-secret.sh filebase_access_key 2>/dev/null)
+FILEBASE_SECRET_KEY=$(~/clawd/scripts/get-secret.sh filebase_secret_key 2>/dev/null)
 SIGNING_KEY=$(~/clawd/scripts/get-secret.sh signing_key 2>/dev/null)
 
-if [ -z "$PINATA_JWT" ]; then
-  echo "❌ Could not load pinata_jwt from secrets"
+if [ -z "$FILEBASE_ACCESS_KEY" ] || [ -z "$FILEBASE_SECRET_KEY" ]; then
+  echo "❌ Could not load filebase credentials from secrets"
   exit 1
 fi
 
@@ -34,11 +35,12 @@ NEXT_PUBLIC_IPFS_BUILD=true \
 mv ../api-ipfs-bak app/api
 trap - EXIT
 
-echo "📦 Uploading to Pinata..."
-# Use Node.js script for reliable recursive directory upload
-CID=$(PINATA_JWT="$PINATA_JWT" node scripts/ipfs-upload.mjs out bankrclub-ens | tail -1)
+echo "📦 Uploading to Filebase..."
+CID=$(FILEBASE_ACCESS_KEY="$FILEBASE_ACCESS_KEY" FILEBASE_SECRET_KEY="$FILEBASE_SECRET_KEY" \
+  node scripts/ipfs-upload.mjs out bankrclub-ens | tail -1)
+
 if [ -z "$CID" ] || [[ "$CID" != Qm* ]]; then
-  echo "❌ Pinata upload failed. Got: $CID"
+  echo "❌ Filebase upload failed. Got: $CID"
   exit 1
 fi
 
@@ -46,7 +48,7 @@ echo "✅ CID: $CID"
 echo "🔗 Updating bankrclub.eth contenthash..."
 
 # Encode CIDv0 (Qm...) as ENS contenthash:
-# 0xe3 0x01 = ipfs-ns varint codec, then CIDv1 header 0x01 0x70 (version + dag-pb), then multihash bytes
+# 0xe3 0x01 = ipfs-ns varint codec, 0x01 0x70 = CIDv1 header (version + dag-pb), then multihash bytes
 CONTENTHASH=$(python3 -c "
 ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 def b58decode(s):
