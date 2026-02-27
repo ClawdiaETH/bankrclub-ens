@@ -61,7 +61,9 @@ cid_bytes = b58decode(cid)
 print('0xe3010170' + cid_bytes.hex())
 ")
 
-cast send 0x3a62109CCAd858907A5750b906618eA7B433d3a3 \
+# 0xF291... is the ENS Registry resolver for bankrclub.eth (the correct one for .limo)
+# 0x3a62... is the CCIP-Read resolver used for subdomain addr() lookups only
+cast send 0xF29100983E058B709F3D539b0c765937B804AC15 \
   "setContenthash(bytes32,bytes)" \
   "$(cast namehash bankrclub.eth)" \
   "$CONTENTHASH" \
