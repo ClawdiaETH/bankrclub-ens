@@ -179,22 +179,3 @@ export async function consumeNonce(nonce: string): Promise<boolean> {
     RETURNING nonce`;
   return rows.length > 0;
 }
-
-// Payment tx tracking — prevent replay attacks
-export async function isPaymentTxUsed(txHash: string): Promise<boolean> {
-  const sql = getDb();
-  const rows = await sql`SELECT 1 FROM payment_txhashes WHERE tx_hash = ${txHash.toLowerCase()}`;
-  return rows.length > 0;
-}
-
-export async function markPaymentTxUsed(
-  txHash: string,
-  address: string,
-  name: string
-): Promise<void> {
-  const sql = getDb();
-  await sql`
-    INSERT INTO payment_txhashes (tx_hash, address, name, created_at)
-    VALUES (${txHash.toLowerCase()}, ${address.toLowerCase()}, ${name}, NOW())
-    ON CONFLICT (tx_hash) DO NOTHING`;
-}

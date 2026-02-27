@@ -187,9 +187,11 @@ export async function POST(req: NextRequest) {
             error: `insufficient ${token} — required ~${requiredTokens.toFixed(2)}, received ${Number(paidTokenWei) / 1e18}`
           }, { status: 400, headers: corsHeaders });
         }
-      } catch {
-        // If price fetch fails, accept the transfer (can't verify amount, but transfer event is confirmed)
-        console.warn('Price check skipped — DexScreener unavailable');
+      } catch (error) {
+        console.warn('Price check failed — rejecting premium claim', error);
+        return NextResponse.json({
+          error: `unable to verify ${token} payment amount right now, please try again`
+        }, { status: 503, headers: corsHeaders });
       }
     }
 

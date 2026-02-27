@@ -8,6 +8,7 @@ import {
   checkAvailability,
   createRegistration,
   getRegistrationByAddress,
+  RegistrationConflictError,
 } from '@/lib/db';
 import { verifyBankrClubHolder } from '@/lib/nftVerify';
 import { FeeRecipientType } from '@/lib/bankrApi';
@@ -184,6 +185,12 @@ export async function POST(req: NextRequest) {
       paymentToken: 'ETH',
     });
   } catch (e) {
+    if (e instanceof RegistrationConflictError && e.reason === 'ADDRESS_TAKEN') {
+      return NextResponse.json(
+        { error: 'one name per wallet - you already have a registration' },
+        { status: 409, headers: corsHeaders },
+      );
+    }
     console.error('Registration failed:', e);
     return NextResponse.json(
       { error: 'registration failed' },
