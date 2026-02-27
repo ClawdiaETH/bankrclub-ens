@@ -1,12 +1,11 @@
 #!/bin/bash
 set -e
 
-FILEBASE_ACCESS_KEY=$(~/clawd/scripts/get-secret.sh filebase_access_key 2>/dev/null)
-FILEBASE_SECRET_KEY=$(~/clawd/scripts/get-secret.sh filebase_secret_key 2>/dev/null)
+PINATA_JWT=$(~/clawd/scripts/get-secret.sh pinata_jwt 2>/dev/null)
 SIGNING_KEY=$(~/clawd/scripts/get-secret.sh signing_key 2>/dev/null)
 
-if [ -z "$FILEBASE_ACCESS_KEY" ] || [ -z "$FILEBASE_SECRET_KEY" ]; then
-  echo "❌ Could not load filebase credentials from secrets"
+if [ -z "$PINATA_JWT" ]; then
+  echo "❌ Could not load pinata_jwt from secrets"
   exit 1
 fi
 
@@ -35,20 +34,16 @@ NEXT_PUBLIC_IPFS_BUILD=true \
 mv ../api-ipfs-bak app/api
 trap - EXIT
 
-echo "📦 Uploading to Filebase..."
-CID=$(FILEBASE_ACCESS_KEY="$FILEBASE_ACCESS_KEY" FILEBASE_SECRET_KEY="$FILEBASE_SECRET_KEY" \
-  node scripts/ipfs-upload.mjs out bankrclub-ens | tail -1)
-
+echo "📦 Uploading to Pinata..."
+CID=$(PINATA_JWT="$PINATA_JWT" node scripts/ipfs-upload.mjs out bankrclub-ens | tail -1)
 if [ -z "$CID" ] || [[ "$CID" != Qm* ]]; then
-  echo "❌ Filebase upload failed. Got: $CID"
+  echo "❌ Pinata upload failed. Got: $CID"
   exit 1
 fi
 
 echo "✅ CID: $CID"
 echo "🔗 Updating bankrclub.eth contenthash..."
 
-# Encode CIDv0 (Qm...) as ENS contenthash:
-# 0xe3 0x01 = ipfs-ns varint codec, 0x01 0x70 = CIDv1 header (version + dag-pb), then multihash bytes
 CONTENTHASH=$(python3 -c "
 ALPHABET = '123456789ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnopqrstuvwxyz'
 def b58decode(s):
