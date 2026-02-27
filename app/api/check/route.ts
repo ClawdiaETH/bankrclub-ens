@@ -7,7 +7,6 @@ import {
   validateName,
 } from '@/lib/registration';
 
-export const dynamic = process.env.NEXT_PUBLIC_IPFS_BUILD === 'true' ? 'auto' : 'force-dynamic';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',

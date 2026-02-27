@@ -8,7 +8,6 @@ import { createPublicClient, http } from 'viem';
 import { base } from 'viem/chains';
 import { consumeNonce } from '@/lib/db';
 
-export const dynamic = process.env.NEXT_PUBLIC_IPFS_BUILD === 'true' ? 'auto' : 'force-dynamic';
 
 const client = createPublicClient({
   chain: base,

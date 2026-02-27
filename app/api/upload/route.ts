@@ -6,7 +6,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyBankrClubHolder } from '@/lib/nftVerify';
 
-export const dynamic = process.env.NEXT_PUBLIC_IPFS_BUILD === 'true' ? 'auto' : 'force-dynamic';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
