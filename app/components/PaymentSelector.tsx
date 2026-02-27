@@ -28,7 +28,7 @@ export default function PaymentSelector({
     <div className="space-y-3">
       <div className="flex items-center justify-between">
         <p className="text-gray-400 text-sm font-medium">ETH price</p>
-        <p className="text-gray-500 text-xs">Hold a token to unlock a lower rate</p>
+        <p className="text-gray-500 text-xs">Pay with $BNKR or $CLAWDIA to unlock a lower rate</p>
       </div>
       <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
         {/* ETH Option */}
@@ -53,7 +53,7 @@ export default function PaymentSelector({
           type="button"
           onClick={() => (hasBnkr ? onChange('BNKR') : undefined)}
           disabled={!hasBnkr}
-          title={!hasBnkr ? 'Hold $BNKR to unlock this rate' : undefined}
+          title={!hasBnkr ? 'Buy $BNKR to unlock this rate' : undefined}
           className={`relative rounded-xl border p-4 text-left transition-all duration-200 ${
             !hasBnkr
               ? 'border-gray-700 bg-gray-800/30 opacity-60 cursor-not-allowed'
@@ -64,7 +64,7 @@ export default function PaymentSelector({
         >
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${selected === 'BNKR' ? 'border-orange-400 bg-orange-400' : 'border-gray-500'}`} />
-            <span className="text-white font-semibold text-sm">Hold $BNKR</span>
+            <span className="text-white font-semibold text-sm">Pay with $BNKR</span>
             <span className="bg-orange-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">10% OFF</span>
           </div>
           {hasBnkr ? (
@@ -96,7 +96,7 @@ export default function PaymentSelector({
           type="button"
           onClick={() => (hasClawdia ? onChange('CLAWDIA') : undefined)}
           disabled={!hasClawdia}
-          title={!hasClawdia ? 'Hold $CLAWDIA to unlock this rate' : undefined}
+          title={!hasClawdia ? 'Buy $CLAWDIA to unlock this rate' : undefined}
           className={`relative rounded-xl border p-4 text-left transition-all duration-200 ${
             !hasClawdia
               ? 'border-gray-700 bg-gray-800/30 opacity-60 cursor-not-allowed'
@@ -112,7 +112,7 @@ export default function PaymentSelector({
           </div>
           <div className="flex items-center gap-2 mb-2 flex-wrap">
             <span className={`w-4 h-4 rounded-full border-2 flex-shrink-0 ${selected === 'CLAWDIA' ? 'border-purple-400 bg-purple-400' : 'border-gray-500'}`} />
-            <span className="text-white font-semibold text-sm">Hold $CLAWDIA</span>
+            <span className="text-white font-semibold text-sm">Pay with $CLAWDIA</span>
             <span className="bg-purple-600 text-white text-xs font-bold px-2 py-0.5 rounded-full">25% OFF</span>
           </div>
           {hasClawdia ? (
