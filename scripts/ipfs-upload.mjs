@@ -1,0 +1,69 @@
+#!/usr/bin/env node
+/**
+ * Upload a directory to Pinata using v3 API with proper folder upload.
+ * All files are prefixed with a virtual directory name so Pinata groups them.
+ * wrapWithDirectory:false = returned CID is the folder itself, not a parent.
+ */
+import { readFileSync, readdirSync, statSync } from 'fs';
+import { join, relative } from 'path';
+import { lookup as mimeType } from 'mime-types';
+
+const PINATA_JWT = process.env.PINATA_JWT;
+const DIR = process.argv[2] || 'out';
+const NAME = process.argv[3] || 'bankrclub-ens';
+const FOLDER_NAME = 'app'; // virtual root prefix Pinata groups by
+
+if (!PINATA_JWT) { console.error('❌ PINATA_JWT required'); process.exit(1); }
+
+function walk(dir, base = dir) {
+  const entries = [];
+  for (const entry of readdirSync(dir)) {
+    const full = join(dir, entry);
+    if (statSync(full).isDirectory()) entries.push(...walk(full, base));
+    else entries.push({ full, rel: relative(base, full) });
+  }
+  return entries;
+}
+
+const files = walk(DIR);
+console.error(`📁 Uploading ${files.length} files from ${DIR}/`);
+
+const boundary = `----FormBoundary${Date.now().toString(36)}`;
+const parts = [];
+
+for (const { full, rel } of files) {
+  const data = readFileSync(full);
+  const mime = mimeType(rel) || 'application/octet-stream';
+  const pinataFilename = `${FOLDER_NAME}/${rel}`;
+  parts.push(
+    Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="file"; filename="${pinataFilename}"\r\nContent-Type: ${mime}\r\n\r\n`),
+    data,
+    Buffer.from('\r\n')
+  );
+}
+
+// metadata + options
+parts.push(
+  Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="pinataMetadata"\r\n\r\n${JSON.stringify({ name: NAME })}\r\n`),
+  Buffer.from(`--${boundary}\r\nContent-Disposition: form-data; name="pinataOptions"\r\n\r\n${JSON.stringify({ cidVersion: 0, wrapWithDirectory: false })}\r\n`),
+  Buffer.from(`--${boundary}--\r\n`)
+);
+
+const body = Buffer.concat(parts);
+
+const res = await fetch('https://api.pinata.cloud/pinning/pinFileToIPFS', {
+  method: 'POST',
+  headers: {
+    Authorization: `Bearer ${PINATA_JWT}`,
+    'Content-Type': `multipart/form-data; boundary=${boundary}`,
+    'Content-Length': String(body.length),
+  },
+  body,
+});
+
+const json = await res.json();
+if (!json.IpfsHash) {
+  console.error('❌ Upload failed:', JSON.stringify(json));
+  process.exit(1);
+}
+console.log(json.IpfsHash);

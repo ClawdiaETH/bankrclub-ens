@@ -35,17 +35,10 @@ mv ../api-ipfs-bak app/api
 trap - EXIT
 
 echo "📦 Uploading to Pinata..."
-# wrapWithDirectory:false = CID points directly to the app files (no extra subfolder level)
-# cidVersion:0 = CIDv0 (Qm...) for simpler ENS contenthash encoding
-RESPONSE=$(curl -s -X POST "https://api.pinata.cloud/pinning/pinFileToIPFS" \
-  -H "Authorization: Bearer $PINATA_JWT" \
-  -F "file=@out;filename=out" \
-  --form-string 'pinataMetadata={"name":"bankrclub-ens"}' \
-  --form-string 'pinataOptions={"cidVersion":0,"wrapWithDirectory":false}')
-
-CID=$(echo "$RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin)['IpfsHash'])")
-if [ -z "$CID" ]; then
-  echo "❌ Pinata upload failed. Response: $RESPONSE"
+# Use Node.js script for reliable recursive directory upload
+CID=$(PINATA_JWT="$PINATA_JWT" node scripts/ipfs-upload.mjs out bankrclub-ens | tail -1)
+if [ -z "$CID" ] || [[ "$CID" != Qm* ]]; then
+  echo "❌ Pinata upload failed. Got: $CID"
   exit 1
 fi
 
