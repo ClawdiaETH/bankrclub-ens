@@ -152,9 +152,10 @@ export async function POST(req: NextRequest) {
 
     if (!receipt) return NextResponse.json({ error: 'tx not found or not yet confirmed on Base' }, { status: 400, headers: corsHeaders });
     if (receipt.status !== '0x1') return NextResponse.json({ error: 'payment transaction failed on-chain' }, { status: 400, headers: corsHeaders });
-    if (receipt.from?.toLowerCase() !== address.toLowerCase()) {
-      return NextResponse.json({ error: 'payment must be sent from your connected wallet' }, { status: 400, headers: corsHeaders });
-    }
+    // Note: receipt.from is NOT checked here — smart wallets (ERC-4337) route txs
+    // through a bundler, so receipt.from is the bundler address, not the user's wallet.
+    // For ERC20: sender is verified via Transfer event topics[1] below.
+    // For ETH: to + value verified below.
 
     if (token === 'ETH') {
       // ETH payment: check via eth_getTransactionByHash for value field
