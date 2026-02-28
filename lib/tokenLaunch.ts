@@ -21,7 +21,7 @@ export type ClaimTokenInfo =
 export interface LaunchClaimTokenParams {
   name: string;
   address: string;
-  tokenId: number | bigint | null | undefined;
+  tokenId?: number | bigint | null;
   recipientType: FeeRecipientType;
   feeRecipientValue: string;
   tweetUrl?: string;

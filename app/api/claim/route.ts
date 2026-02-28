@@ -7,7 +7,6 @@ import {
   RegistrationConflictError,
 } from '@/lib/db';
 import { getTokenPriceInEth, calcTokenAmount, toTokenWei, BNKR_ADDRESS, CLAWDIA_ADDRESS, TRANSFER_TOPIC } from '@/lib/tokenPrice';
-import { verifyBankrClubHolder } from '@/lib/nftVerify';
 import { FeeRecipientType } from '@/lib/bankrApi';
 import { announceRegistration } from '@/lib/neynar';
 import { createSubnodeOnchain } from '@/lib/ensSubdomain';
@@ -98,12 +97,6 @@ export async function POST(req: NextRequest) {
     } catch {
       // Invalid URL — ignore silently
     }
-  }
-
-  // Verify NFT ownership
-  const { isHolder, tokenId } = await verifyBankrClubHolder(address);
-  if (!isHolder) {
-    return NextResponse.json({ error: 'BankrClub NFT required' }, { status: 403, headers: corsHeaders });
   }
 
   // Enforce one-per-wallet restriction before premium payment verification
@@ -225,7 +218,6 @@ export async function POST(req: NextRequest) {
       registration = await createPremiumRegistration({
         subdomain: name,
         address,
-        tokenId,
         isPremium,
         paymentToken: token,
         premiumPaidEth: discountedPrice,
@@ -235,7 +227,6 @@ export async function POST(req: NextRequest) {
       registration = await createRegistration({
         subdomain: name,
         address,
-        tokenId,
         isPremium,
         paymentToken: token,
         premiumPaidEth: undefined,
@@ -272,7 +263,6 @@ export async function POST(req: NextRequest) {
     tokenInfo = await launchClaimToken({
       name,
       address,
-      tokenId,
       recipientType,
       feeRecipientValue: normalizedFeeRecipientValue,
       tweetUrl: validatedTweetUrl,

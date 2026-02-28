@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, Fragment } from 'react';
 import { ConnectButton } from '@rainbow-me/rainbowkit';
-import { useAccount, useReadContract, useSendTransaction, useWriteContract } from 'wagmi';
+import { useAccount, useSendTransaction, useWriteContract } from 'wagmi';
 import { parseEther } from 'viem';
 import { getTokenPriceInEth, calcTokenAmount, toTokenWei, BNKR_ADDRESS, CLAWDIA_ADDRESS } from '@/lib/tokenPrice';
 import TypewriterSubdomain from './TypewriterSubdomain';
@@ -11,18 +11,6 @@ import { getDiscountTokenBalances, TokenBalances } from '@/lib/tokenBalances';
 import type { FeeRecipientType } from '@/lib/bankrApi';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || '';
-
-const BANKRCLUB_NFT = '0x9FAb8C51f911f0ba6dab64fD6E979BcF6424Ce82' as const;
-
-const ERC721_ABI = [
-  {
-    name: 'balanceOf',
-    type: 'function',
-    stateMutability: 'view',
-    inputs: [{ name: 'owner', type: 'address' }],
-    outputs: [{ name: '', type: 'uint256' }],
-  },
-] as const;
 
 interface AvailabilityResult {
   available: boolean;
@@ -79,16 +67,6 @@ export default function Home() {
   const [tokenAmount, setTokenAmount] = useState<number | null>(null);
   const [tokenPriceFetching, setTokenPriceFetching] = useState(false);
 
-  const { data: nftBalance } = useReadContract({
-    address: BANKRCLUB_NFT,
-    abi: ERC721_ABI,
-    functionName: 'balanceOf',
-    args: address ? [address] : undefined,
-    query: { enabled: !!address },
-  });
-
-  const isHolder = nftBalance !== undefined && nftBalance > 0n;
-
   // Claim form state
   const [name, setName] = useState('');
   const [availability, setAvailability] = useState<AvailabilityResult | null>(null);
@@ -139,14 +117,14 @@ export default function Home() {
     };
   }, [logoPreview]);
 
-  // Fetch discount token balances once wallet is verified as holder
+  // Fetch discount token balances when wallet is connected
   useEffect(() => {
-    if (!address || !isHolder) {
+    if (!address) {
       setTokenBalances(null);
       return;
     }
     getDiscountTokenBalances(address).then(setTokenBalances).catch(() => setTokenBalances(null));
-  }, [address, isHolder]);
+  }, [address]);
 
   // Reset state when wallet changes
   useEffect(() => {
@@ -386,7 +364,7 @@ export default function Home() {
             Your name. Your token. Your fees — forever.
           </p>
           <p className="text-base text-gray-500 max-w-xl mx-auto">
-            BankrClub members get a free ENS subdomain + earn 57% of every trade on their personal token.
+            For Bankr maxis — claim your free ENS subdomain and launch a personal token in one click.
           </p>
         </div>
 
@@ -403,9 +381,9 @@ export default function Home() {
                 />
                 <div className="text-center md:text-left">
                   <h2 className="text-3xl font-bold text-white mb-2">
-                    For BankrClub NFT holders
+                    For Bankr maxis
                   </h2>
-                  <p className="text-orange-400 font-semibold">1,000 founding members only</p>
+                  <p className="text-orange-400 font-semibold">Free for 9+ char names · premium 3–8 chars</p>
                 </div>
               </div>
               <p className="text-gray-300 text-lg">
@@ -413,7 +391,7 @@ export default function Home() {
                 <span className="font-mono text-blue-400 font-semibold">
                   yourname.bankrclub.eth
                 </span>{' '}
-                — your permanent web3 identity, free for BankrClub members.
+                — your permanent onchain identity, free for Bankr maxis.
               </p>
             </div>
           </div>
@@ -615,45 +593,13 @@ export default function Home() {
             </>
           )}
 
-          {/* ── State: Connected, not holder ── */}
-          {isConnected && !isHolder && !claimResult && (
-            <div className="p-8 text-center space-y-6">
-              <div className="text-5xl">🔒</div>
-              <h3 className="text-2xl font-bold text-white">BankrClub NFT required</h3>
-              <p className="text-gray-400 max-w-md mx-auto">
-                You need to hold a BankrClub NFT to claim a{' '}
-                <span className="font-mono text-blue-400">yourname.bankrclub.eth</span> subdomain.
-              </p>
-              <div className="flex flex-col sm:flex-row gap-4 justify-center">
-                <a
-                  href="https://opensea.io/collection/bankr-club"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-gradient-to-r from-purple-600 to-orange-600 text-white font-bold py-3 px-8 rounded-xl hover:opacity-90 transition-opacity"
-                >
-                  Get BankrClub NFT →
-                </a>
-                <div className="flex justify-center items-center">
-                  <ConnectButton />
-                </div>
-              </div>
-              <p className="text-gray-500 text-xs font-mono">
-                NFT: 0x9FAb8C51f911f0ba6dab64fD6E979BcF6424Ce82 on Base
-              </p>
-            </div>
-          )}
-
-          {/* ── State: Connected + holder — Claim form ── */}
-          {isConnected && isHolder && !claimResult && (
+          {/* ── State: Connected — Claim form ── */}
+          {isConnected && !claimResult && (
             <div className="p-8 space-y-6">
               <div className="flex items-center justify-between mb-2">
                 <h3 className="text-xl font-bold text-white">Claim your subdomain</h3>
                 <ConnectButton />
               </div>
-              <div className="bg-green-900/30 border border-green-700 rounded-xl p-4 text-sm text-green-400">
-                ✅ BankrClub NFT holder verified
-              </div>
-
               {/* ── Name input ── */}
               <div>
                 <div className="flex items-center justify-between mb-2">
@@ -801,7 +747,7 @@ export default function Home() {
                           : 'bg-gray-800 border-gray-600 text-gray-300 hover:border-gray-500'
                       }`}
                     >
-                      Use my NFT art
+                      Default
                     </button>
                     <button
                       onClick={() => setLogoMode('custom')}
@@ -816,7 +762,7 @@ export default function Home() {
                   </div>
 
                   {logoMode === 'nft' && (
-                    <p className="text-gray-500 text-xs">Your BankrClub NFT image will be used automatically.</p>
+                    <p className="text-gray-500 text-xs">Bankr will use your BankrClub NFT art if you hold one, otherwise a default logo.</p>
                   )}
 
                   {logoMode === 'custom' && (
@@ -995,14 +941,22 @@ export default function Home() {
               ecosystem 🐚
             </p>
             <p className="text-gray-500 text-xs">
-              BankrClub NFT:{' '}
               <a
-                href="https://basescan.org/address/0x9FAb8C51f911f0ba6dab64fD6E979BcF6424Ce82"
+                href="https://bankr.bot"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="font-mono hover:text-blue-400 transition-colors"
+                className="hover:text-orange-400 transition-colors"
               >
-                0x9FAb...Ce82
+                bankr.bot
+              </a>
+              {' '}·{' '}
+              <a
+                href="https://github.com/ClawdiaETH/bankrclub-ens/blob/master/docs/agent-registration.md"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-blue-400 transition-colors"
+              >
+                agent API docs
               </a>
             </p>
           </div>
