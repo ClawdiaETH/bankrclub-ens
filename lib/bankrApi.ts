@@ -79,7 +79,7 @@ export async function launchToken(
     tokenName: subdomain.charAt(0).toUpperCase() + subdomain.slice(1),
     tokenSymbol: subdomain.toUpperCase().slice(0, 10),
     description: `Personal token for ${subdomain}.bankrclub.eth — BankrClub member`,
-    websiteUrl: `https://${subdomain}.bankrclub.eth.limo`,
+    websiteUrl: `https://bankrclub.eth.limo`,
     feeRecipient,
     simulateOnly,
   };

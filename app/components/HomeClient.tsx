@@ -76,6 +76,8 @@ export default function Home() {
   const [claiming, setClaiming] = useState(false);
   const [claimResult, setClaimResult] = useState<ClaimResult | null>(null);
   const [claimError, setClaimError] = useState<string | null>(null);
+  // Persists a confirmed on-chain payment tx across claim retries — prevents double-charging
+  const [confirmedPaymentTxHash, setConfirmedPaymentTxHash] = useState<string | null>(null);
 
   // Payment token state
   const [paymentToken, setPaymentToken] = useState<PaymentToken>('ETH');
@@ -132,6 +134,7 @@ export default function Home() {
     setPaymentToken('ETH');
     setFeeRecipientType('wallet');
     setFeeRecipientValue('');
+    setConfirmedPaymentTxHash(null);
   }, [address]);
 
   // Debounced availability check
@@ -158,6 +161,8 @@ export default function Home() {
       setAvailability(null);
       return;
     }
+    // If name changes, any previously confirmed payment is no longer valid
+    setConfirmedPaymentTxHash(null);
     const timer = setTimeout(() => checkAvailability(trimmed), 500);
     return () => clearTimeout(timer);
   }, [name, checkAvailability]);
@@ -201,7 +206,8 @@ export default function Home() {
     setClaimError(null);
     setClaimStatus(null);
 
-    let paymentTxHash: string | undefined;
+    // If we already have a confirmed on-chain payment for this name, reuse it
+    let paymentTxHash: string | undefined = confirmedPaymentTxHash ?? undefined;
 
     try {
       const baseClaimPayload = {
@@ -215,8 +221,8 @@ export default function Home() {
         logoUrl: logoMode === 'custom' && customLogoUrl ? customLogoUrl : undefined,
       };
 
-      // Step 1: Send payment for premium names (ETH or ERC20 token)
-      if (availability.isPremium && displayPrice) {
+      // Step 1: Send payment for premium names — skip if we already have a confirmed tx
+      if (availability.isPremium && displayPrice && !paymentTxHash) {
         setClaimStatus('Checking eligibility…');
         const preflightRes = await fetch(`${API_BASE}/api/claim`, {
           method: 'POST',
@@ -274,7 +280,11 @@ export default function Home() {
             body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_getTransactionReceipt', params: [paymentTxHash] }),
           });
           const { result } = await rpc.json() as { result: { status: string } | null };
-          if (result?.status === '0x1') break;
+          if (result?.status === '0x1') {
+            // Payment confirmed — persist it so retries don't send another payment
+            setConfirmedPaymentTxHash(paymentTxHash);
+            break;
+          }
           if (result?.status === '0x0') { setClaimError('Payment transaction failed on-chain.'); return; }
           if (attempt === 29) { setClaimError('Payment confirmation timed out — please try again.'); return; }
         }
@@ -294,6 +304,7 @@ export default function Home() {
       if (!res.ok) {
         setClaimError(data.error || 'Claim failed');
       } else {
+        setConfirmedPaymentTxHash(null); // clear on success
         setClaimResult({ ...data, paymentToken });
       }
     } catch {
@@ -878,6 +889,13 @@ export default function Home() {
                       </div>
                     </div>
                   )}
+                </div>
+              )}
+
+              {/* ── Confirmed payment notice ── */}
+              {confirmedPaymentTxHash && !claimError && (
+                <div className="bg-blue-900/30 border border-blue-700 rounded-xl p-4 text-sm text-blue-300">
+                  ✅ Payment confirmed on-chain — clicking again will retry registration without charging you again.
                 </div>
               )}
 
