@@ -6,6 +6,7 @@ import { useAccount, useSendTransaction, useWriteContract } from 'wagmi';
 import { parseEther } from 'viem';
 import { getTokenPriceInEth, calcTokenAmount, toTokenWei, BNKR_ADDRESS, CLAWDIA_ADDRESS } from '@/lib/tokenPrice';
 import TypewriterSubdomain from './TypewriterSubdomain';
+import RegistrationFeed from './RegistrationFeed';
 import PaymentSelector, { PaymentToken } from './PaymentSelector';
 import { getDiscountTokenBalances, TokenBalances } from '@/lib/tokenBalances';
 import type { FeeRecipientType } from '@/lib/bankrApi';
@@ -961,6 +962,9 @@ export default function Home() {
             </p>
           </div>
         </div>
+
+        {/* Social proof feed */}
+        <RegistrationFeed />
 
         {/* Bottom features */}
         <div className="mt-8 text-center space-y-2">

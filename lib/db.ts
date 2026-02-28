@@ -179,3 +179,9 @@ export async function consumeNonce(nonce: string): Promise<boolean> {
     RETURNING nonce`;
   return rows.length > 0;
 }
+
+export async function getRegistrationCount(): Promise<number> {
+  const sql = getDb();
+  const rows = await sql`SELECT COUNT(*)::int AS count FROM registrations`;
+  return (rows[0] as { count: number })?.count ?? 0;
+}
