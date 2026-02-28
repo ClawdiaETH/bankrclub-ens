@@ -638,7 +638,7 @@ export default function Home() {
                           <span className="text-green-400 font-semibold font-mono col-span-2">Free!</span>
                         </div>
                         <div className="pt-3 border-t border-gray-700 space-y-2">
-                          <p className="text-gray-400 text-xs">Hold tokens to unlock discounts:</p>
+                          <p className="text-gray-400 text-xs">Pay with tokens to unlock discounts:</p>
                           <div className="flex items-center justify-between">
                             <span className="text-orange-400 font-semibold">$BNKR</span>
                             <span className="text-gray-400 text-xs">10% off</span>
